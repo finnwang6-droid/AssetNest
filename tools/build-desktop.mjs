@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {createRequire} from 'node:module';
 import {zipSync,unzipSync} from 'fflate';
 const root=path.resolve(import.meta.dirname,'..'),release=path.join(root,'releases'),build=path.join(root,'test-output/desktop-build');fs.mkdirSync(build,{recursive:true});fs.mkdirSync(release,{recursive:true});
 const runtime=path.join(root,'runtime/node.exe'),expected=fs.readFileSync(path.join(root,'runtime/SHASUMS256.txt'),'utf8').split(/\r?\n/).find(l=>l.endsWith(' win-x64/node.exe')).split(/\s+/)[0];
@@ -18,9 +19,22 @@ fs.mkdirSync(path.join(root,'desktop/bin'),{recursive:true});fs.copyFileSync(pat
 const files={};const add=(key,file)=>files[key]=fs.readFileSync(file);
 for(const name of ['maintenance-jobs.mjs','maintenance-worker.mjs','trash.mjs','server.mjs','desktop-actions.mjs','file-payload.mjs','zip-stream.mjs','transfers.mjs','diagnostics.mjs','formats.mjs','preview-tasks.mjs','thumbnail-worker.mjs','psd-preview.mjs','psd-worker.mjs','local-layout.mjs','storage.mjs','organize.mjs','search.mjs','features.mjs','libraries.mjs','eagle-library.mjs','eagle-pack.mjs','backup.mjs','capture-input.mjs','maintenance.mjs','rebuild.mjs','package.json'])add('app/'+name,path.join(root,name));
 function directory(prefix,dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,entry.name);if(entry.isDirectory())directory(prefix+'/'+entry.name,full);else if(entry.isFile())add(prefix+'/'+entry.name,full);}}
-directory('app/public',path.join(root,'public'));directory('app/extension',path.join(root,'extension'));for(const name of ['fflate','sharp','semver','detect-libc','@img'])directory('app/node_modules/'+name,path.join(root,'node_modules',name));
-for(const name of ['ag-psd','pako','base64-js']){const dir=path.join(root,'node_modules',name);for(const file of ['package.json','LICENSE','LICENSE.MIT','index.js'])if(fs.existsSync(path.join(dir,file)))add('app/node_modules/'+name+'/'+file,path.join(dir,file));if(name!=='base64-js')for(const file of fs.readdirSync(path.join(dir,'dist')))if(file.endsWith('.js')&&fs.statSync(path.join(dir,'dist',file)).isFile())add('app/node_modules/'+name+'/dist/'+file,path.join(dir,'dist',file));}
-directory('app/node_modules/pako/lib',path.join(root,'node_modules/pako/lib'));
+directory('app/public',path.join(root,'public'));directory('app/extension',path.join(root,'extension'));
+// Resolve each package from its parent so npm and pnpm installations both work.
+const bundled=new Map();
+function bundlePackage(name,parent,optional=false){
+ const require=createRequire(parent);
+ const candidate=(require.resolve.paths(name)||[]).map(dir=>path.join(dir,name,'package.json')).find(file=>fs.existsSync(file));
+ if(!candidate){if(optional)return;throw Error('Required dependency not installed: '+name);}
+ const manifest=fs.realpathSync(candidate);
+ const meta=JSON.parse(fs.readFileSync(manifest));if(bundled.has(name)){if(bundled.get(name)!==meta.version)throw Error('Conflicting dependency versions: '+name);return;}
+ bundled.set(name,meta.version);directory('app/node_modules/'+name,path.dirname(manifest));
+ for(const dependency of Object.keys(meta.dependencies||{}))bundlePackage(dependency,manifest);
+ for(const dependency of Object.keys(meta.optionalDependencies||{}))bundlePackage(dependency,manifest,true);
+}
+for(const name of ['fflate','sharp','ag-psd'])bundlePackage(name,path.join(root,'package.json'));
+for(const name of ['LICENSE','THIRD_PARTY_NOTICES.md','README.md'])add(name,path.join(root,name));
+add('docs/AUTHENTICATION.md',path.join(root,'docs/AUTHENTICATION.md'));
 add('app/FolderPicker.exe',path.join(build,'FolderPicker.exe'));add('assetnest.ico',path.join(root,'assets/assetnest.ico'));add('AssetNest.exe',path.join(build,'AssetNest.exe'));add('Uninstall.ps1',path.join(root,'desktop/Uninstall.ps1'));add('runtime/node.exe',runtime);add('runtime/NODE-LICENSE.txt',path.join(root,'runtime/NODE-LICENSE.txt'));add('runtime/SHASUMS256.txt',path.join(root,'runtime/SHASUMS256.txt'));
 add('Microsoft.Web.WebView2.Core.dll',path.join(webviewLib,'Microsoft.Web.WebView2.Core.dll'));add('Microsoft.Web.WebView2.WinForms.dll',path.join(webviewLib,'Microsoft.Web.WebView2.WinForms.dll'));add('WebView2Loader.dll',path.join(webview,'package/runtimes/win-x64/native/WebView2Loader.dll'));add('WEBVIEW2-LICENSE.txt',path.join(webview,'package/LICENSE.txt'));add('WEBVIEW2-NOTICE.txt',path.join(webview,'package/NOTICE.txt'));
 files['assetnest-install.json']=Buffer.from(JSON.stringify({name:'AssetNest',version:'0.9.0',webview2:{sdk:'1.0.4258.31',packageSha256:'56f7f4b8bf9aee4b8efefbbdd4f67d5f74ebd1b100ed0806da71bf76af481aa9',runtime:'system-evergreen'},files:[...Object.keys(files),'assetnest-install.json'],runtime:{version:'v24.19.0',sha256:expected,source:'https://nodejs.org/dist/v24.19.0/win-x64/node.exe'}},null,2));

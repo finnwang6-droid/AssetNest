@@ -15,4 +15,6 @@ public/vendor/ 中携带 PDF.js 预览所需模块、CMaps、字体与 WASM 文�
 3. 运行 node tools/build-icon.mjs（如需重建图标），然后 node tools/build-desktop.mjs。
 4. 生成的安装包位于 releases/，此目录不提交 Git。
 
+运行 node tools/package-release.mjs 生成浏览器扩展 ZIP、软件与扩展完整包和 SHA256SUMS.txt，用于上传 GitHub Releases。打包器沿依赖关系收集已安装的服务端依赖，支持 npm 与 pnpm 布局，并保留各包许可证；PDF.js 使用 public/vendor/ 中的固定资源。
+
 源码启动的服务可独立使用，不需要执行桌面构建。源码内没有附带预编译桌面组件、第三方 SDK 二进制或 Node.exe。

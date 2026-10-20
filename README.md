@@ -2,6 +2,12 @@
 
 本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前服务版本 0.9.0。无需云端账号，素材和索引保存在本机。
 
+## 下载安装
+
+Windows x64 用户可直接下载 [0.9.0 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.9.0/AssetNest-Setup-0.9.0.exe)，无需安装 Node.js。
+
+[完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.9.0/AssetNest-0.9.0-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
+
 ## 功能
 
 - 图片及多种文件格式的本地保存、预览、搜索、标签与文件夹整理。
