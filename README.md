@@ -2,6 +2,29 @@
 
 本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前服务版本 0.9.0。无需云端账号，素材和索引保存在本机。
 
+## 界面与操作演示
+
+浏览素材 → 搜索 → 大图预览 → 多文件夹归类。以下为真实运行界面，使用 24 张原创示例素材，本机路径已遮盖。
+
+![AssetNest 操作演示：浏览、搜索、预览和分类](docs/media/assetnest-demo.gif)
+
+<details>
+<summary>查看高清界面截图</summary>
+
+素材浏览与信息面板：
+
+![素材浏览与信息面板](docs/media/library.png)
+
+按名称与标签搜索：
+
+![素材搜索](docs/media/search.png)
+
+大图预览与元数据：
+
+![大图预览与元数据](docs/media/preview.png)
+
+</details>
+
 ## 下载安装
 
 Windows x64 用户可直接下载 [0.9.0 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.9.0/AssetNest-Setup-0.9.0.exe)，无需安装 Node.js。
