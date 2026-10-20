@@ -1,0 +1,16 @@
+import {test,after} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import sharp from 'sharp';
+import {decodePsd,psdFileDimensions} from './psd-preview.mjs';
+import {rasterPreview,formatKind} from './formats.mjs';
+import {digest} from './storage.mjs';
+import {clearPreviewCache,diagnostics} from './diagnostics.mjs';
+import {fixturePsd} from './tools/psd-fixture.mjs';
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'assetnest-psd-'));
+for(const rle of [false,true])test('PSD '+(rle?'RLE':'raw')+' composite renders expected pixels without changing originals',async()=>{const file=path.join(temp,rle?'rle.psd':'raw.psd'),original=fixturePsd(8,6,{rle});fs.writeFileSync(file,original);const png=await decodePsd(file),pixels=await sharp(png).raw().toBuffer();assert.deepEqual([...pixels.subarray(0,4)],[220,90,40,255]);assert.deepEqual(psdFileDimensions(file),{width:8,height:6});assert.deepEqual(fs.readFileSync(file),original);assert.equal(formatKind('PSD'),'raster');});
+test('invalid and oversized PSD previews fail without caching bad output',async()=>{const file=path.join(temp,'bad.psd');fs.writeFileSync(file,'bad PSD');await assert.rejects(decodePsd(file),/PSD/);const header=fixturePsd().subarray(0,38);header.writeUInt32BE(30000,14);header.writeUInt32BE(30000,18);fs.writeFileSync(file,header);await assert.rejects(decodePsd(file),/4000 万像素/);});
+test('PSD preview and thumbnail cache share decoding, preserve originals and use the sidecar directory',async()=>{const file=path.join(temp,'cache.psd');fs.writeFileSync(file,fixturePsd(600,300));const hash=digest(fs.readFileSync(file)),supportRoot=path.join(temp,'support'),catalog={root:path.join(temp,'original'),supportRoot,path:()=>file,row:()=>row},row={id:'CACHE',file:'cache.psd',hash,metadata:JSON.stringify({ext:'psd'})};const [a,b,thumb]=await Promise.all([rasterPreview(catalog,row),rasterPreview(catalog,row),rasterPreview(catalog,row,{thumbnail:true})]);assert.equal(a,b);assert.ok(a.startsWith(supportRoot+path.sep));const meta=await sharp(thumb).metadata();assert.equal(meta.width,480);assert.equal(meta.height,240);const stamp=fs.statSync(a).mtimeMs;assert.equal(await rasterPreview(catalog,row),a);assert.equal(fs.statSync(a).mtimeMs,stamp);assert.equal(digest(fs.readFileSync(file)),hash);assert.equal(clearPreviewCache(catalog).removed,2);});
+after(()=>{if(path.dirname(temp)===os.tmpdir()&&path.basename(temp).startsWith('assetnest-psd-'))fs.rmSync(temp,{recursive:true,force:true});});

@@ -1,0 +1,45 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {Catalog,digest} from './storage.mjs';
+import {Transfers} from './transfers.mjs';
+import {MaintenanceJobs} from './maintenance-jobs.mjs';
+import {verifyBackup} from './backup.mjs';
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'assetnest-maintenance-'));
+const records=[];
+function fixture(name){const c=new Catalog(path.join(temp,name)),bytes=Buffer.from('original image bytes '+name),metadata=JSON.stringify({id:'ONE',name:'原图',ext:'bin',folders:[],tags:['tag'],custom:'preserve',isDeleted:false});c.commit({items:[{row:{id:'ONE',metadata,file:'ONE.info/原图.bin',thumb:null,hash:digest(bytes)},source:{file_metadata:metadata,pack_id:null},files:{'原图.bin':bytes,'notes.txt':Buffer.from('unknown attachment')}}]});const transfers=new Transfers(c),jobs=new MaintenanceJobs(c,transfers);records.push({c,transfers,jobs});return {c,bytes,transfers,jobs};}
+async function finish(jobs,id){await jobs.jobs.get(id).promise;return jobs.get(id);}
+test('background backup has progress, blocks mutation gate and publishes only a verified snapshot',async()=>{
+ const {c,bytes,jobs,transfers}=fixture('backup');const job=jobs.start('backup');assert.equal(job.status,'running');assert.throws(()=>transfers.assertIdle(),/正在运行/);const result=await finish(jobs,job.id);assert.equal(result.status,'completed',result.error);assert.equal(result.result.verified,true);assert.equal(verifyBackup(result.destination).items,1);assert.deepEqual(fs.readFileSync(path.join(result.destination,'images/ONE.info/原图.bin')),bytes);assert.equal(fs.readFileSync(path.join(result.destination,'images/ONE.info/notes.txt'),'utf8'),'unknown attachment');assert.equal(c.integrity().healthy,true);transfers.assertIdle();
+});
+test('integrity reports damaged originals as findings while originals remain untouched',async()=>{
+ const {c,jobs}=fixture('integrity');const file=c.path(c.row('ONE').file);fs.appendFileSync(file,'damaged');const before=digest(fs.readFileSync(file));const done=await finish(jobs,jobs.start('integrity').id);assert.equal(done.status,'completed',done.error);assert.equal(done.result.healthy,false);assert.ok(done.result.issues.some(i=>i.kind==='content-hash-mismatch'));assert.equal(digest(fs.readFileSync(file)),before);const backup=await finish(jobs,jobs.start('backup').id);assert.equal(backup.status,'failed');assert.equal(fs.existsSync(backup.destination),false);
+});
+test('cancelled work releases the mutation gate, keeps originals, and creates no normal backup',async()=>{
+ const {c,bytes,jobs,transfers}=fixture('cancel');const job=jobs.start('backup');jobs.cancel(job.id);const done=await finish(jobs,job.id);assert.equal(done.status,'cancelled',done.error);assert.equal(fs.existsSync(done.destination),false);assert.deepEqual(fs.readFileSync(c.path(c.row('ONE').file)),bytes);transfers.assertIdle();
+});
+test('background rebuild preserves files, attachment and metadata in a distinct new library',async()=>{
+ const {c,bytes,jobs}=fixture('rebuild'),target=path.join(temp,'rebuilt.library'),before=fs.readFileSync(c.path('ONE.info/metadata.json'));const done=await finish(jobs,jobs.start('rebuild',{target}).id);assert.equal(done.status,'completed',done.error);assert.equal(done.destination,target);assert.deepEqual(fs.readFileSync(c.path('ONE.info/metadata.json')),before);const rebuilt=new Catalog(target);try{assert.equal(rebuilt.integrity().healthy,true);assert.deepEqual(fs.readFileSync(rebuilt.path(rebuilt.row('ONE').file)),bytes);assert.equal(fs.readFileSync(rebuilt.path('ONE.info/notes.txt'),'utf8'),'unknown attachment');assert.equal(JSON.parse(rebuilt.row('ONE').metadata).custom,'preserve');}finally{rebuilt.close();}assert.throws(()=>jobs.start('rebuild',{target}),/不存在/);assert.throws(()=>jobs.start('rebuild',{target:path.join(c.root,'nested')}),/独立/);
+});
+test('completed reports survive manager restart and incomplete task records are never presented as completed',async()=>{
+ const {c,jobs,transfers}=fixture('history');const job=await finish(jobs,jobs.start('integrity').id);const second=new MaintenanceJobs(c,transfers);assert.equal(second.get(job.id).result.healthy,true);const file=path.join(jobs.directory(job.id),'job.json'),record=JSON.parse(fs.readFileSync(file));record.status='running';fs.writeFileSync(file,JSON.stringify(record));const restarted=new MaintenanceJobs(c,transfers);assert.equal(restarted.get(job.id).status,'interrupted');assert.ok(fs.existsSync(path.join(jobs.directory(job.id),'cancel')));
+});
+test('source state changing before publication prevents a backup from being published',async()=>{
+ const {c,bytes,jobs}=fixture('external-change');let checks=0;c.beforeBackup=()=>{if(++checks>1)throw Error('原素材库已被外部修改');};const done=await finish(jobs,jobs.start('backup').id);assert.equal(done.status,'failed');assert.match(done.error,/外部修改/);assert.equal(fs.existsSync(done.destination),false);assert.deepEqual(fs.readFileSync(c.path(c.row('ONE').file)),bytes);
+});
+test('a progress persistence failure is isolated to the background job',async()=>{
+ const {c,bytes,jobs,transfers}=fixture('progress-failure'),persist=jobs.persist.bind(jobs);jobs.persist=job=>{if(job.phase==='检查完成')throw Error('injected disk failure');return persist(job);};const done=await finish(jobs,jobs.start('integrity').id);assert.equal(done.status,'failed');assert.match(done.error,/disk failure/);assert.deepEqual(fs.readFileSync(c.path(c.row('ONE').file)),bytes);transfers.assertIdle();
+});
+test('partial cleanup failure retains ownership proof and allows a later safe retry',async()=>{
+ const {c,bytes,jobs}=fixture('cleanup-retry'),done=await finish(jobs,jobs.start('integrity').id),job=jobs.jobs.get(done.id),spec=JSON.parse(fs.readFileSync(path.join(jobs.directory(job.id),'spec.json')));fs.mkdirSync(spec.stage);fs.writeFileSync(path.join(spec.stage,'.assetnest-job-owner'),job.id);fs.writeFileSync(path.join(spec.stage,'locked.bin'),'partial output');job.status='failed';job.cleanupPending=true;const remove=fs.rmSync;fs.rmSync=(file,options)=>{if(file===path.join(spec.stage,'locked.bin'))throw Error('injected locked file');return remove(file,options);};try{assert.throws(()=>jobs.cleanupJob(job.id),/locked file/);assert.equal(fs.readFileSync(path.join(spec.stage,'.assetnest-job-owner'),'utf8'),job.id);}finally{fs.rmSync=remove;}assert.equal(jobs.cleanupJob(job.id).cleanupPending,false);assert.equal(fs.existsSync(spec.stage),false);assert.deepEqual(fs.readFileSync(c.path(c.row('ONE').file)),bytes);
+});
+
+test('a real parent-process exit is marked interrupted after restart without modifying the source',async()=>{
+ const root=path.join(temp,'parent-crash');let c=new Catalog(root);const bytes=Buffer.alloc(1024*1024,7),metadata=JSON.stringify({id:'ONE',name:'crash source',ext:'bin',folders:[],tags:[]});c.commit({items:[{row:{id:'ONE',metadata,file:'ONE.info/original.bin',thumb:null,hash:digest(bytes)},source:{file_metadata:metadata,pack_id:null},files:{'original.bin':bytes}}]});c.close();
+ const code=`import {Catalog} from ${JSON.stringify(new URL('./storage.mjs',import.meta.url).href)};import {Transfers} from ${JSON.stringify(new URL('./transfers.mjs',import.meta.url).href)};import {MaintenanceJobs} from ${JSON.stringify(new URL('./maintenance-jobs.mjs',import.meta.url).href)};const c=new Catalog(${JSON.stringify(root)}),t=new Transfers(c),j=new MaintenanceJobs(c,t),persist=j.persist.bind(j);j.persist=job=>{persist(job);if(job.phase==='检查数据库')process.exit(93);};j.start('backup');`;
+ const child=spawnSync(process.execPath,['--input-type=module','-e',code],{encoding:'utf8',windowsHide:true,timeout:10000});assert.equal(child.status,93,child.stderr);c=new Catalog(root);const transfers=new Transfers(c),jobs=new MaintenanceJobs(c,transfers);try{const job=jobs.list()[0];assert.equal(job.status,'interrupted');assert.equal(fs.existsSync(job.destination),false);assert.equal(digest(fs.readFileSync(c.path(c.row('ONE').file))),digest(bytes));assert.equal(c.integrity().healthy,true);for(let n=0;n<50&&jobs.get(job.id).cleanupPending;n++){try{jobs.cleanupJob(job.id);}catch{}if(jobs.get(job.id).cleanupPending)await new Promise(r=>setTimeout(r,100));}assert.equal(jobs.get(job.id).cleanupPending,false);}finally{await jobs.close();await transfers.close();c.close();}
+});
+after(async()=>{for(const {jobs,transfers,c}of records){await jobs.close();await transfers.close();c.close();}/* Preserve private fixtures for inspecting cancelled outputs and backup manifests. */});

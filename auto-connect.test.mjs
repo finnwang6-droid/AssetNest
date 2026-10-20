@@ -1,0 +1,5 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {autoConnect,localServer} from './extension/auto-connect.js';
+test('automatic connection accepts only the configured loopback HTTP origin',()=>{assert.equal(localServer('http://localhost:41600/'),'http://localhost:41600');for(const url of ['https://example.com','http://192.168.1.1','file:///test','http://127.0.0.1:41600/path','http://user:pw@localhost:41600','http://localhost:41600/?key=abc'])assert.throws(()=>localServer(url));});
+test('offline and foreign local services never open tabs or persist credentials',async()=>{const browser={tabs:{create(){throw Error('should never be called');}},storage:{local:{set(){throw Error('should never be called');}}}};await assert.rejects(autoConnect('http://127.0.0.1:41623',{browser,request:async()=>{throw Error('offline');}}),e=>e.code==='SERVICE_UNAVAILABLE'&&e.retryable);await assert.rejects(autoConnect('http://127.0.0.1:41623',{browser,request:async()=>({ok:true,json:async()=>({name:'Other',libraryId:'x'})})}),e=>e.code==='CONFIG_REQUIRED');});

@@ -1,0 +1,33 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
+import {Libraries} from './libraries.mjs';
+import {digest} from './storage.mjs';
+import {byteRange} from './formats.mjs';
+import {fixturePng} from './tools/stage2-fixture.mjs';
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'assetnest-stage5-'));
+process.env.ASSETNEST_DATA=path.join(temp,'http-startup');process.env.ASSETNEST_PORT='41624';process.env.ASSETNEST_REQUIRE_LOCATION='1';
+const service=await import('./server.mjs'),base='http://127.0.0.1:41624';let key,library;
+before(async()=>{await new Promise(r=>service.server.listen(41624,'127.0.0.1',r));const j=await(await fetch(base+'/api/bootstrap')).json();key=j.key;library=j.libraryId;});
+const request=(route,body,extra={})=>fetch(base+'/api/'+route,{method:'POST',headers:{'X-Assetnest-Key':key,'Content-Type':'application/json',...extra},body:JSON.stringify(body)});
+test('byte ranges handle seeks, suffixes, EOF and invalid ranges',()=>{assert.deepEqual(byteRange('bytes=2-5',10),{start:2,end:5});assert.deepEqual(byteRange('bytes=-3',10),{start:7,end:9});assert.deepEqual(byteRange('bytes=8-',10),{start:8,end:9});assert.deepEqual(byteRange('bytes=8-99',10),{start:8,end:9});for(const h of ['bytes=10-','bytes=4-2','bytes=-0','bytes=0-1,3-5','bytes=-','nonsense'])assert.equal(byteRange(h,10),false);});
+test('location copy preserves source, unknown metadata and persists selection on restart',()=>{const initial=path.join(temp,'copy-source'),target=path.join(temp,'copy-target');let libraries=new Libraries(initial);try{const c=libraries.catalog,bytes=fixturePng(4,4,[80,10,20]),m=JSON.stringify({id:'ORIGINAL',name:'设计',ext:'png',custom:{kept:42},assetnestRegions:[]});c.commit({items:[{row:{id:'ORIGINAL',metadata:m,file:'ORIGINAL.info/original.png',thumb:null,hash:digest(bytes)},source:{file_metadata:m,pack_id:null},files:{'original.png':bytes}}]});const before=c.row('ORIGINAL'),oldId=c.libraryId;libraries.setup({mode:'copy',directory:target,name:'复制库'});assert.deepEqual(libraries.catalog.row('ORIGINAL'),before);assert.notEqual(libraries.catalog.libraryId,oldId);assert.equal(libraries.catalog.integrity().healthy,true);assert.equal(fs.existsSync(path.join(initial,'images/ORIGINAL.info/original.png')),true);assert.throws(()=>libraries.setup({mode:'copy',directory:initial,name:'覆盖'}));libraries.close();libraries=new Libraries(initial);assert.equal(libraries.current,target);assert.equal(libraries.locationConfirmed,true);const regions=[{x:.1,y:.2,width:.3,height:.4,text:'标签'}];libraries.catalog.updateItem('ORIGINAL',{assetnestRegions:regions});assert.deepEqual(JSON.parse(libraries.catalog.row('ORIGINAL').metadata).custom,{kept:42});assert.deepEqual(JSON.parse(libraries.catalog.source('ORIGINAL').file_metadata).assetnestRegions,regions);assert.throws(()=>libraries.catalog.updateItem('ORIGINAL',{assetnestRegions:[{x:.9,y:0,width:.5,height:.5,text:'越界'}]}));}finally{libraries.close();}});
+test('first-run gate, native-picker access, chosen-root writes, previews and streaming',async()=>{
+ assert.equal((await(await fetch(base+'/api/bootstrap')).json()).needsLocation,true);assert.equal((await(await fetch(base+'/api/health')).json()).storageConfigured,false);
+ assert.equal((await request('capture',{url:'http://example.com/image.png'})).status,409);
+ assert.equal((await request('libraries/picker',{}, {Origin:'chrome-extension://test'})).status,403);
+ const selected=path.join(temp,'chosen-materials');let r=await request('libraries/setup',{mode:'create',directory:selected,name:'素材保存位置'});assert.equal(r.status,200,await r.text());
+ const j=await(await fetch(base+'/api/bootstrap')).json();assert.equal(j.needsLocation,false);assert.equal(j.dataPath,selected);assert.equal(j.key,key);assert.notEqual(j.libraryId,library);
+ const bytes=fixturePng(8,8,[30,100,70]);r=await request('capture',{base64:'data:image/png;base64,'+bytes.toString('base64'),name:'采集到新位置'});assert.equal(r.status,200);const item=(await r.json()).item;assert.equal(fs.existsSync(path.join(selected,'images',item.id+'.info/'+item.name+'.png')),true);assert.equal(fs.existsSync(path.join(temp,'http-startup/images',item.id+'.info')),false);
+ const upload=async(name,bytes)=>{const r=await fetch(base+'/api/upload',{method:'POST',headers:{'X-Assetnest-Key':key,'X-File-Name':encodeURIComponent(name)},body:bytes});assert.equal(r.status,200,await r.clone().text());return (await r.json()).item;};
+ const obj=Buffer.from('# retained bytes\nv 0 0 0\n'),unknown=await upload('模型.obj',obj);r=await fetch(base+'/media/'+unknown.id+'/original');assert.equal(r.headers.get('content-disposition').startsWith('attachment;'),true);assert.deepEqual(Buffer.from(await r.arrayBuffer()),obj);
+ const wav=await upload('声音.wav',Buffer.from('RIFF01234567890123456789'));r=await fetch(base+'/media/'+wav.id+'/original',{headers:{Range:'bytes=4-8'}});assert.equal(r.status,206);assert.equal(r.headers.get('content-range'),'bytes 4-8/24');assert.equal(await r.text(),'01234');assert.equal((await fetch(base+'/media/'+wav.id+'/original',{headers:{Range:'bytes=100-'}})).status,416);
+ const tiff=await sharp(bytes).tiff().toBuffer(),raster=await upload('图像.tiff',tiff);r=await fetch(base+'/media/'+raster.id+'/preview');assert.equal(r.status,200);assert.equal((await sharp(Buffer.from(await r.arrayBuffer())).metadata()).format,'png');assert.equal(fs.existsSync(path.join(selected,'previews',raster.hash+'.png')),true);assert.deepEqual(fs.readFileSync(path.join(selected,'images',raster.id+'.info/'+raster.name+'.tiff')),tiff);
+ assert.equal((await(await fetch(base+'/api/integrity',{headers:{'X-Assetnest-Key':key}})).json()).healthy,true);
+ for(const directory of ['cmaps','standard_fonts','wasm']){const ext=directory==='cmaps'?'.bcmap':directory==='wasm'?'.wasm':'.pfb';const name=fs.readdirSync(path.join(import.meta.dirname,'public/vendor/pdfjs',directory)).find(n=>n.endsWith(ext));const asset=await fetch(base+'/vendor/pdfjs/'+directory+'/'+name);assert.equal(asset.status,200);assert.ok((await asset.arrayBuffer()).byteLength>0);}
+ assert.equal((await fetch(base+'/vendor/pdfjs/cmaps/missing.bcmap')).status,404);
+});
+after(async()=>{await new Promise(r=>service.server.close(r));service.catalog.close();});

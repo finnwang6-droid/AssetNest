@@ -1,0 +1,13 @@
+const type='application/x-assetnest-items';
+export function installFolderDrop({getLibraryId,getSelection,assign,onError}){
+ let dragging=null,target=null,busy=false,suppressUntil=0;
+ function highlight(row){if(target!==row){target?.classList.remove('folder-drop-target');target=row;target?.classList.add('folder-drop-target');}}
+ function reset(){highlight(null);dragging=null;if(!busy)document.body.classList.remove('asset-dragging');}
+ document.addEventListener('dragstart',e=>{const card=e.target.closest('#grid .card');if(!card)return;if(busy||e.target.closest('button,input,textarea')){e.preventDefault();return;}const selected=getSelection(),ids=selected.has(card.dataset.id)?[...selected]:[card.dataset.id];if(ids.length>500){e.preventDefault();onError('一次最多拖动 500 个素材');return;}dragging={ids,libraryId:getLibraryId(),token:crypto.randomUUID()};e.dataTransfer.effectAllowed='copy';e.dataTransfer.setData(type,JSON.stringify(dragging));document.body.classList.add('asset-dragging');},true);
+ document.addEventListener('dragover',e=>{if(![...e.dataTransfer.types].includes(type))return;const row=e.target.closest('#folder-list [data-folder-row]');if(row&&dragging&&!busy){e.preventDefault();e.dataTransfer.dropEffect='copy';highlight(row);}else highlight(null);},true);
+ document.addEventListener('dragleave',e=>{if(target&&!target.contains(e.relatedTarget))highlight(null);},true);
+ document.addEventListener('drop',async e=>{if(![...e.dataTransfer.types].includes(type))return;e.preventDefault();e.stopImmediatePropagation();const row=e.target.closest('#folder-list [data-folder-row]'),state=dragging;suppressUntil=Date.now()+300;highlight(null);if(!row){reset();return;}try{const payload=JSON.parse(e.dataTransfer.getData(type));if(!state||payload.token!==state.token||payload.libraryId!==state.libraryId||getLibraryId()!==state.libraryId)throw Error('拖拽来源已失效，请在当前素材库重新拖动');busy=true;await assign(state.ids,row.dataset.folderRow,state.libraryId);}catch(error){onError(error.message);}finally{busy=false;reset();}},true);
+ document.addEventListener('dragend',()=>{suppressUntil=Date.now()+300;reset();},true);
+ document.addEventListener('pointerdown',()=>{if(!dragging&&!busy)suppressUntil=0;},true);
+ document.addEventListener('click',e=>{if(Date.now()<suppressUntil&&e.target.closest('#grid')){e.preventDefault();e.stopImmediatePropagation();}},true);
+}

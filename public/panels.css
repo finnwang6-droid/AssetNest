@@ -1,0 +1,63 @@
+/* One three-panel shell for browsing and every viewer. */
+:root{color-scheme:dark;--sidebar-width:239px;--inspector-width:239px;--header-height:43px}
+html,body{height:100%;background:#181a1c;color:#ddd}
+#asset-context-menu{position:fixed;inset:auto;margin:0;padding:5px;width:224px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);overflow-y:auto;border:1px solid #454649;border-radius:7px;background:#27282a;color:#eee;box-shadow:0 8px 25px #0007;z-index:1000}
+#asset-context-menu[hidden]{display:none}
+#asset-context-menu button{display:block;width:100%;border:0;border-radius:4px;background:transparent;padding:8px 12px;text-align:left;color:#ddd;font-size:12px;line-height:1.4}
+#asset-context-menu button:hover,#asset-context-menu button:focus-visible{background:#3c3d40;outline:none}
+#asset-context-menu button:disabled{color:#737479;cursor:default;opacity:1}
+#asset-context-menu button.danger{color:#f09090}
+#asset-context-menu hr{border:0;border-top:1px solid #424346;margin:4px 5px}
+body.native-desktop .card,body.native-desktop .sidebar,body.native-desktop main header{user-select:none}
+#maintenance-dialog{width:700px;max-width:94vw;overflow-x:hidden;padding:24px}
+#maintenance-dialog>div{min-width:0!important;max-width:100%!important;width:100%}
+#maintenance-summary{overflow-wrap:anywhere;line-height:1.8}
+#maintenance-close{font-size:13px;padding:5px 8px}
+#maintenance-jobs{max-height:40vh;overflow:auto;font-size:12px}
+#maintenance-jobs a{color:#b6baff;margin:0 12px}
+.sidebar{width:var(--sidebar-width)}.sidebar-footer{width:calc(var(--sidebar-width) - 1px)}
+main{margin-left:var(--sidebar-width);margin-right:var(--inspector-width);height:100dvh}
+main header{height:var(--header-height);background:#181a1c;border-bottom:1px solid #222326}
+#inspector{width:var(--inspector-width)}.inspector-content{height:calc(100% - 115px);overflow-y:auto}
+#preview-toolbar{display:flex;align-items:center;gap:8px;width:100%;height:100%;min-width:0}
+body:not(.preview-mode) #preview-toolbar{display:none}
+body.preview-mode main header>*:not(#preview-toolbar),body.preview-mode .workspace{display:none!important}
+body.preview-mode #inspector>.inspector-content,body.preview-mode #inspector>.inspector-bottom{display:none!important}
+#detail-dialog{position:fixed;inset:var(--header-height) var(--inspector-width) 0 var(--sidebar-width);width:auto;max-width:none;height:auto;max-height:none;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:#181a1c;box-shadow:none;overflow:hidden;z-index:5}
+#detail-dialog[open]{display:block;min-height:0}
+#detail-dialog::backdrop{display:none}
+#detail-dialog .preview{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;padding:14px 20px 2px;overflow:hidden;background:#181a1c;touch-action:none}
+#detail-image{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;flex-shrink:0;user-select:none}
+#preview-toolbar button{border:0;background:transparent;color:#ccc;border-radius:4px;font-size:13px;min-width:24px;height:28px;padding:3px 5px;display:inline-flex;align-items:center;justify-content:center}
+#preview-toolbar button:hover{background:#303135}#preview-toolbar button:disabled{opacity:.3;cursor:default}
+#preview-toolbar #detail-close{position:static;font-size:20px;left:auto;right:auto;top:auto;border-radius:4px}
+#preview-position{min-width:48px;font-size:11px;font-weight:600;color:#ddd;white-space:nowrap}
+#preview-toolbar .zoom-tools{position:static;inset:auto;display:flex;align-items:center;gap:3px;margin:0 auto;padding:0;background:transparent;border-radius:0;font-size:11px;min-width:0}
+#zoom-range{width:90px;height:3px;accent-color:#eee;cursor:pointer;margin:0 5px}#zoom-value{min-width:37px;text-align:center;color:#bbb}
+#preview-toolbar #zoom-fit,#preview-toolbar #zoom-actual{font-size:10px;white-space:nowrap}
+#preview-toolbar #toggle-annotations{font-size:17px}#toggle-annotations[aria-pressed=true]{background:#43404e;color:#dacfff}
+.preview-inspector{position:absolute;inset:43px 0 0;overflow-y:auto;padding:8px 14px 20px;scrollbar-width:thin}
+body:not(.preview-mode) .preview-inspector{display:none}
+.preview-summary{position:relative;margin-bottom:10px}.preview-summary img{display:block;width:100%;max-height:195px;object-fit:contain;border-radius:5px;background:#191a1c}
+#preview-format{position:absolute;top:5px;left:5px;font-size:10px;background:#333a;color:#eee;padding:2px 4px;border-radius:3px}
+#inspector .detail-panel{width:100%;padding:0;max-height:none;overflow:visible;color:#bbb;font-size:12px}
+.detail-panel .dialog-header{display:none}.detail-panel label{font-size:11px;color:#a5a5a8;margin:12px 0 8px}
+.detail-panel input,.detail-panel textarea,.detail-panel select{display:block;width:100%;margin-top:6px;border:1px solid #36373a;border-radius:5px;background:#191a1c;color:#ddd;padding:7px 8px;outline:none;font:12px/1.6 'Segoe UI','Microsoft YaHei',sans-serif}
+.detail-panel textarea{resize:vertical;min-height:55px;max-height:180px}.detail-panel select[multiple]{height:70px}
+.detail-panel a{margin-top:6px;font-size:11px;line-height:1.6;color:#b3bacd;overflow-wrap:anywhere;max-height:62px;overflow:auto}
+.detail-panel .dialog-actions{margin-top:16px;gap:6px}.detail-panel .dialog-actions button{font-size:11px;padding:7px 6px}
+#detail-stats{padding:9px 0;border-top:1px solid #333;border-bottom:1px solid #333;font-size:10px;line-height:1.8;margin:12px 0;gap:6px}
+.detail-panel .palette{gap:4px;flex-wrap:wrap;margin:9px 0}.detail-panel .palette span{width:16px;height:16px}
+.detail-panel .preview-name-label{font-size:0;margin:6px 0}.detail-panel .preview-name-label textarea{font-size:12px;font-weight:600;min-height:48px;max-height:110px;margin-top:0}.detail-panel textarea[name=annotation]{min-height:46px;max-height:100px}.detail-panel select[multiple]{height:55px;min-height:45px}.preview-basic-heading{font-size:12px;color:#999;border-top:1px solid #353638;padding-top:13px;margin-top:16px}.preview-metadata{display:grid;grid-template-columns:62px minmax(0,1fr);margin:0;line-height:1.8;width:100%}.preview-metadata dt,.preview-metadata dd{margin:0;min-width:0}.preview-metadata dd{overflow-wrap:anywhere;color:#aaa;font-weight:600}.detail-panel label:has(#detail-source) a{max-height:38px;padding:6px 7px;background:#191a1c;border:1px solid #36373a;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-panel .preview-annotation-label,.detail-panel .preview-source-label{font-size:0;margin:8px 0}.detail-panel .preview-annotation-label textarea{font-size:12px;min-height:34px;max-height:120px;margin-top:0}.detail-panel .preview-source-label a{margin-top:0}.detail-panel .preview-name-label textarea{max-height:140px}
+.region-toolbar{left:14px;right:14px;top:12px;max-width:640px;background:#242528f5;border:1px solid #484950;border-radius:6px;padding:8px;box-shadow:0 5px 18px #0005}
+.region-toolbar button,.region-toolbar select,.region-toolbar input{font-size:11px;min-height:27px}.region-toolbar input{max-width:none}
+#asset-viewer{width:100%;height:100%;padding:10px 8px 20px;max-height:100%;gap:14px;touch-action:auto}
+#asset-media{max-height:calc(100% - 70px);margin:auto}#asset-viewer audio{max-width:500px}
+.viewer-controls{gap:10px;font-size:12px;flex-shrink:0}.viewer-controls button{font-size:11px;padding:5px 8px}#pdf-canvas{flex-shrink:0}
+#font-specimen{min-height:200px;max-height:100%;background:#202123;color:#eee;border:1px solid #414247;padding:12px}
+.preview-mode .preview-nav{display:none}
+.sidebar-collapsed{--sidebar-width:45px}.inspector-hidden{--inspector-width:0px}
+@media(max-width:1050px){:root{--sidebar-width:210px;--inspector-width:220px}.library-heading{gap:3px}#library-switch-trigger kbd{display:none}.density-control{left:145px}#zoom-range{width:60px}#preview-toolbar{gap:3px}#preview-toolbar #zoom-actual{display:none}main header{padding:0 10px}}
+@media(max-width:760px){:root{--sidebar-width:46px;--inspector-width:210px}#inspector{display:block}.sidebar{padding:0 5px}.sidebar>*:not(.library-top){display:none}.library-top{padding:0;justify-content:center}.library-top>*:not(#library-menu){display:none}#preview-toolbar #zoom-fit{display:none}#zoom-range{width:45px}#preview-position{min-width:38px}#detail-dialog .preview{padding:10px}.preview-inspector{padding:8px 10px}}
+@media(max-width:540px){:root{--inspector-width:190px}#preview-toolbar .zoom-tools button{display:none}#zoom-range{width:40px}#preview-toolbar{gap:2px}#preview-toolbar button{min-width:20px;padding:2px}#preview-position{font-size:10px;min-width:32px}#zoom-value{min-width:28px;font-size:10px}}

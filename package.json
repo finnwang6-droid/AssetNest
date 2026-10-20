@@ -1,0 +1,26 @@
+{
+  "name": "assetnest-local",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "Local asset library and browser collector with Eagle pack compatibility",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test.mjs queue.test.mjs stage1.test.mjs stage2.test.mjs stage3.test.mjs stage4.test.mjs auto-connect.test.mjs stage5.test.mjs local-layout.test.mjs stage6.test.mjs desktop-actions.test.mjs eagle-library.test.mjs psd-preview.test.mjs preview-tasks.test.mjs trash.test.mjs maintenance-jobs.test.mjs",
+    "icons": "node tools/build-icon.mjs"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "pdfjs-dist": "6.4.299",
+    "sharp": "0.35.5",
+    "ag-psd": "31.0.3"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/finnwang6-droid/AssetNest.git"
+  }
+}

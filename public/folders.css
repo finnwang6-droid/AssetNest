@@ -1,0 +1,39 @@
+/* Folder visuals use the image palette from this machine's Eagle installation. */
+:root{font-family:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",sans-serif;font-synthesis:weight;font-size:13px;text-rendering:optimizeLegibility}
+body,button,input,textarea,select{font-family:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",sans-serif;letter-spacing:normal}
+.nav{font-weight:400;color:#dedee0}.nav b{font-weight:400;font-variant-numeric:tabular-nums}
+.section-heading{font-size:12px;color:#a7a7ab}
+.sidebar #folder-list .folder-row{padding-left:calc(var(--folder-depth,0)*14px)!important;min-height:27px;border-radius:5px;background:transparent;position:relative;display:flex;align-items:center}
+.sidebar #folder-list .folder-row:hover{background:#2d2e30}.sidebar #folder-list .folder-row.active{background:#38393b}
+.sidebar #folder-list .folder-toggle{width:10px;min-width:10px;height:25px;padding:0;border:0;background:transparent;overflow:visible;color:#a6a6aa;font-size:10px;opacity:1}
+.sidebar #folder-list .folder-toggle:disabled{visibility:hidden}
+.sidebar #folder-list .folder{display:flex;align-items:center;gap:7px;height:27px;padding:3px 7px 3px 0;flex:1;min-width:0;margin:0;border:0;background:transparent;border-radius:0;color:#e0e0e2;font-size:13px;font-weight:400;line-height:21px}
+.folder-symbol{display:inline-block;flex:0 0 16px;width:16px;height:16px;background:currentColor;mask-image:var(--folder-icon);mask-size:contain;mask-repeat:no-repeat;mask-position:center}
+.folder-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.sidebar #folder-list .folder small{margin-left:auto;margin-right:0;min-width:19px;text-align:right;flex-shrink:0;font-size:12px;font-weight:400;line-height:20px;color:#b4b4b8;font-variant-numeric:tabular-nums}
+.sidebar #folder-list .folder-edit{position:static;flex:0 0 0;width:0;min-width:0;overflow:hidden;padding:0;opacity:0;border:0;background:none;color:#bbb;height:25px}
+.sidebar #folder-list .folder-row:hover .folder-edit,.sidebar #folder-list .folder-edit:focus-visible{width:20px;flex-basis:20px;opacity:1}
+.sidebar #folder-list .folder-row:hover .folder small{margin-right:0}
+.card strong,.card .name{font-size:13px;line-height:1.4;font-weight:500}.card small{font-size:12px;color:#a7a7aa}
+#inspector{font-size:13px;color:#ceced1}.detail-panel input,.detail-panel textarea,.detail-panel select{font-family:inherit;font-size:13px;line-height:1.65;color:#e1e1e3}.detail-panel label{font-size:12px;color:#b6b6ba}.preview-metadata{font-size:12px}
+#asset-context-menu{font-family:inherit;font-size:13px;overflow:visible;margin:0;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);box-sizing:border-box}
+#asset-context-menu[hidden],#asset-context-menu [hidden]{display:none!important}
+#asset-context-menu.folder-context{width:272px;min-width:272px;padding:4px;background:#191a1c;border:1px solid #4c4d50;border-radius:8px;box-shadow:0 6px 22px #0007;color:#e5e5e7}
+#asset-context-menu.folder-context>button,.context-submenu>button{display:flex;align-items:center;gap:6px;width:100%;height:28px;min-height:28px;padding:4px 5px;border:0;border-radius:3px;background:none;color:inherit;font-size:13px;font-weight:400;text-align:left;white-space:nowrap}
+#asset-context-menu.folder-context button:hover,#asset-context-menu.folder-context button:focus-visible,.context-submenu button:hover,.context-submenu button:focus-visible{background:#353638;outline:none}
+#asset-context-menu.folder-context button:disabled{opacity:.38;cursor:default;background:none}
+#asset-context-menu .menu-icon{width:16px;height:16px;flex:0 0 16px;object-fit:contain;pointer-events:none}
+#asset-context-menu .menu-label{flex:1;min-width:0}#asset-context-menu .menu-shortcut{margin-left:auto;font-size:11px;color:#929296}
+#asset-context-menu.folder-context hr{margin:4px 0;border:0;border-top:1px solid #303134}
+#asset-context-menu .context-search{display:block;width:100%;height:30px;background:transparent;border:0;border-bottom:1px solid #303134;border-radius:0;margin:0 0 4px;padding:4px 8px;color:#e4e4e6;font:13px "Segoe UI","Microsoft YaHei UI",sans-serif;outline:none}
+.context-submenu{position:fixed;z-index:2;padding:7px;background:#191a1c;border:1px solid #4c4d50;border-radius:7px;box-shadow:0 6px 22px #0007;max-height:calc(100vh - 12px);overflow:auto;color:#e5e5e7}
+.context-submenu.folder-icon-grid{display:grid;grid-template-columns:repeat(12,24px);gap:0;padding:12px;width:314px;min-width:314px;max-width:calc(100vw - 12px)}
+.folder-icon-grid .icon-group-break{grid-column:1/-1;height:12px}
+#asset-context-menu .folder-icon-grid>button{width:24px;min-width:24px;height:24px;min-height:24px;padding:3px;border-radius:3px;justify-content:center}
+#asset-context-menu .folder-icon-grid .menu-icon{width:18px;height:18px;flex-basis:18px;filter:brightness(0) invert(.9)}
+#asset-context-menu .folder-icon-grid .selected{background:#424346;outline:1px solid #777}
+#asset-context-menu .folder-color-row{display:flex;align-items:center;justify-content:center;gap:8px;padding:5px 0 7px}
+#asset-context-menu .folder-color-choice{width:16px;height:16px;min-width:16px;min-height:16px;border:0;border-radius:50%;padding:0;background:var(--swatch)}
+#asset-context-menu .folder-color-choice:hover,#asset-context-menu .folder-color-choice:focus-visible{background:var(--swatch);outline:2px solid #e0e0e0;outline-offset:2px}
+#asset-context-menu .folder-color-choice[aria-checked=true]{box-shadow:0 0 0 1px #191a1c,0 0 0 2px #aaa}
+@media(max-height:650px){#asset-context-menu.folder-context{overflow-y:auto;overflow-x:hidden}.context-submenu.folder-icon-grid{position:fixed}}
