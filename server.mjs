@@ -25,7 +25,7 @@ import {encodeZip} from './zip-stream.mjs';
 import {packExportEntries} from './eagle-pack.mjs';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
-import {desktopAction} from './desktop-actions.mjs';
+import {desktopAction,desktopDragFiles} from './desktop-actions.mjs';
 import {psdDimensions,psdFileDimensions} from './psd-preview.mjs';
 import {PreviewTasks} from './preview-tasks.mjs';
 import sharp from 'sharp';
@@ -133,7 +133,7 @@ const server=http.createServer(async(req,res)=>{
   if(parts.length===5&&parts[4]==='retry'&&req.method==='POST')return json(res,200,watches.retry(parts[3]));
   throw error('监控文件夹接口不存在',404);
  }
- if(route.startsWith('/api/desktop/')&&req.method==='POST'){if(extension||process.env.ASSETNEST_DESKTOP!=='1')throw error('此操作请在桌面客户端中使用',403);const p=await input(req);checkLibrary();return json(res,200,await desktopAction(catalog,route.slice(13),p.id));}
+ if(route.startsWith('/api/desktop/')&&req.method==='POST'){if(extension||process.env.ASSETNEST_DESKTOP!=='1')throw error('此操作请在桌面客户端中使用',403);const p=await input(req);checkLibrary();if(route==='/api/desktop/drag-files'){if(!req.headers['x-assetnest-library'])throw error('请指定目标素材库',409);return json(res,200,desktopDragFiles(catalog,p.ids));}return json(res,200,await desktopAction(catalog,route.slice(13),p.id));}
  if(route==='/api/cache/clear'&&req.method==='POST'){if(extension)throw error('请在软件中清理缓存',403);const result=await previews.clear();checkLibrary();return json(res,200,result);}
  if(route==='/api/previews'&&req.method==='GET')return json(res,200,previews.status());
  if(route.startsWith('/api/previews/pdf/')&&req.method==='POST'){if(extension)throw error('请在软件中生成 PDF 封面',403);const owner=catalog,previewOwner=previews,bytes=await body(req,2*1024**2);checkLibrary();return json(res,200,await storePdfThumbnail(owner,previewOwner,route.slice(18),req.headers['x-assetnest-hash'],bytes));}
