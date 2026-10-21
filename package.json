@@ -1,12 +1,12 @@
 {
   "name": "assetnest-local",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "description": "Local asset library and browser collector with Eagle pack compatibility",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test.mjs queue.test.mjs stage1.test.mjs stage2.test.mjs stage3.test.mjs stage4.test.mjs auto-connect.test.mjs stage5.test.mjs local-layout.test.mjs stage6.test.mjs desktop-actions.test.mjs eagle-library.test.mjs psd-preview.test.mjs preview-tasks.test.mjs trash.test.mjs maintenance-jobs.test.mjs watch-folders.test.mjs property-preview.test.mjs native-drag.test.mjs native-file-drop.test.mjs",
+    "test": "node --test capture-view.test.mjs test.mjs queue.test.mjs stage1.test.mjs stage2.test.mjs stage3.test.mjs stage4.test.mjs auto-connect.test.mjs stage5.test.mjs local-layout.test.mjs stage6.test.mjs desktop-actions.test.mjs eagle-library.test.mjs psd-preview.test.mjs preview-tasks.test.mjs trash.test.mjs maintenance-jobs.test.mjs watch-folders.test.mjs property-preview.test.mjs native-drag.test.mjs native-file-drop.test.mjs",
     "icons": "node tools/build-icon.mjs"
   },
   "engines": {

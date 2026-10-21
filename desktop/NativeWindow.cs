@@ -93,7 +93,7 @@ class NativeWindow : Form {
     e.Handled=true;var deferral=e.GetDeferral();BeginInvoke(new Action(()=>{try{using(var dialog=new SaveFileDialog{Title="保存文件",FileName=suggested,Filter=filter,OverwritePrompt=true}){if(dialog.ShowDialog(this)==DialogResult.OK)e.ResultFilePath=dialog.FileName;else e.Cancel=true;}}catch{e.Cancel=true;}finally{deferral.Complete();}}));
    };
    core.ProcessFailed+=(s,e)=>{if(e.ProcessFailedKind==CoreWebView2ProcessFailedKind.BrowserProcessExited||e.ProcessFailedKind==CoreWebView2ProcessFailedKind.RenderProcessExited){status.Text="界面进程已退出。素材保存在原位置，请关闭窗口后从托盘重新打开。";view.Dispose();Controls.Remove(view);view=null;initialized=false;status.BringToFront();}};
-   await core.AddScriptToExecuteOnDocumentCreatedAsync("if(location.origin==="+json.Serialize(home)+"){Object.defineProperty(window,'assetnestDesktop',{value:Object.freeze({host:'webview2',version:'0.10.3',fileDrag:true})});}");
+   await core.AddScriptToExecuteOnDocumentCreatedAsync("if(location.origin==="+json.Serialize(home)+"){Object.defineProperty(window,'assetnestDesktop',{value:Object.freeze({host:'webview2',version:'0.11.0',fileDrag:true})});}");
    core.NavigationCompleted+=(s,e)=>{if(e.IsSuccess)status.Visible=false;else{status.Text="界面加载失败，请关闭窗口后从托盘重新打开。";status.Visible=true;status.BringToFront();initialized=false;}};
    core.Navigate(home);
    if(testing)File.WriteAllText(Path.Combine(profile,"native-host.json"),json.Serialize(new{host="webview2",runtime=environment.BrowserVersionString,defaultContextMenus=settings.AreDefaultContextMenusEnabled,devTools=settings.AreDevToolsEnabled,browserAccelerators=settings.AreBrowserAcceleratorKeysEnabled,statusBar=settings.IsStatusBarEnabled,handle=Handle.ToInt64(),processId=Process.GetCurrentProcess().Id,title=Text}));

@@ -13,12 +13,12 @@ export function scanPage(options={}) {
     const list=[...unique.values()].sort((a,b)=>(b.priority||0)-(a.priority||0)||b.width-a.width||(b.density||1)-(a.density||1));if(!list.length)return;
     const current=list.find(c=>c.url===absolute(info.current))||list[list.length-1],best=list[0];
     const key=best.url;const existing=groups.get(key);
-    if(existing){const seen=new Set(existing.candidates.map(c=>c.url));for(const c of list)if(!seen.has(c.url))existing.candidates.push(c);existing.width=Math.max(existing.width,info.width||0);existing.height=Math.max(existing.height,info.height||0);return;}
+    if(existing){const seen=new Set(existing.candidates.map(c=>c.url));for(const c of list)if(!seen.has(c.url))existing.candidates.push(c);existing.width=Math.max(existing.width,info.width||0);existing.height=Math.max(existing.height,info.height||0);if(existing.currentUrl===current.url&&(info.width||0)*(info.height||0)>existing.pageWidth*existing.pageHeight){existing.pageWidth=info.width||0;existing.pageHeight=info.height||0;}return;}
     if(groups.size>=maxImages){truncated=true;return;}
-    groups.set(key,{id:key,url:best.url,currentUrl:current.url,previewUrl:current.url,name:info.name||document.title,website:location.href,frameUrl:location.href,width:best.width||info.width||0,height:info.height||0,candidates:list.slice(0,12),discovery:info.kind});
+    groups.set(key,{id:key,url:best.url,currentUrl:current.url,previewUrl:current.url,name:info.name||document.title,website:location.href,frameUrl:location.href,width:best.width||info.width||0,height:info.height||0,pageWidth:info.width||0,pageHeight:info.height||0,candidateWidth:best.width||0,candidates:list.slice(0,12),discovery:info.kind});
   }
   for(const img of document.images){
-    const candidates=[],width=Math.max(img.naturalWidth||0,img.width||0),height=Math.max(img.naturalHeight||0,img.height||0);
+    const candidates=[],width=img.naturalWidth||img.width||0,height=img.naturalHeight||img.height||0;
     const add=(url,source,priority=1,extra={})=>{if(url)candidates.push({url,source,priority,...extra});};
     add(img.currentSrc||img.src,'current',1,{width});add(img.getAttribute('src'),'src',0);
     for(const attr of ['data-original','data-full','data-full-src','data-zoom-image','data-large-image'])add(img.getAttribute(attr),attr,5);

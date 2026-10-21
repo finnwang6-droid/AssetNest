@@ -6,3 +6,7 @@
 #duplicate-panel{margin:12px 20px;padding:14px;background:#eef0ff;border:1px solid #dce0fa;border-radius:10px}#duplicate-panel h2{font-size:15px}.duplicate-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center}.duplicate-image{display:block;width:100%;height:150px;object-fit:contain;background:#fff;border-radius:6px;margin-bottom:8px}.duplicate-grid p{overflow-wrap:anywhere;margin:5px 0}#duplicate-panel button{font-size:12px;margin-top:6px}#job-results{font:11px "Microsoft YaHei",sans-serif;white-space:pre-wrap;max-height:100px;overflow:auto;color:#48526b}#status{overflow-wrap:anywhere}
 
 .results-page{width:min(780px,100%);margin:20px auto;background:#fafbfe}.results-page #duplicate-panel .duplicate-image{height:180px}.results-page .intro h1{font-size:20px}#duplicate-panel{margin-top:10px}#duplicate-panel h2{margin:0 0 10px}.duplicate-grid p{margin:3px 0}.duplicate-image{height:105px}#duplicate-panel button{padding:8px 10px}#job-current{color:#59637d!important}
+
+#job-destination{overflow-wrap:anywhere;color:#59637d!important}.duplicate-scope{margin:10px 0 4px;color:#59637d}#job-error-list button{padding:3px 7px;font-size:10px;margin:4px}#job-results{max-height:220px}.job-actions{flex-wrap:wrap}
+
+.candidate-link{display:block;font-size:10px;color:#626bdd;text-decoration:none;padding:5px 0}.candidate-link:hover{text-decoration:underline}

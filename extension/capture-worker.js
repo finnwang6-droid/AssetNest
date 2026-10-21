@@ -37,8 +37,8 @@ async function inOriginalPage(item){
 }
 async function capture(item,context={}){
  const c=await config(),health=await ensureLocal(c);c.libraryId=health.libraryId;
- if(context.target&&(context.target.server!==c.server||context.target.libraryId!==health.libraryId))throw captureError('LIBRARY_CHANGED','目标素材库已切换，请取消原任务后重新提交',{pause:true});
- if(context.jobId&&!context.target&&health.libraryId)await queue.mutate(async()=>{const current=await queue.read();if(current?.id===context.jobId&&!current.target){current.target={server:c.server,libraryId:health.libraryId};await queue.save(current);}});
+ if(context.target&&(context.target.server!==c.server||context.target.libraryId!==health.libraryId))throw captureError('LIBRARY_CHANGED','目标素材库已切换；任务保留在原库，确认后可将未保存项改存到当前素材库',{pause:true});
+ if(context.jobId&&!context.target&&health.libraryId)await queue.mutate(async()=>{const current=await queue.read();if(current?.id===context.jobId&&!current.target){current.target=await captureTarget(c,health);await queue.save(current);}});
  if(context.key){const receipt=await api('capture-receipt?key='+encodeURIComponent(context.key),c);if(receipt.found)return {...receipt.result,transport:'receipt'};}
  if(item.kind==='bookmark')return {...await api('bookmark',c,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:item.website||item.url,name:item.name,tags:item.tags,folderId:item.folderId,thumbnail:item.thumbnail||null,duplicateMode:item.duplicateMode||'ask',idempotencyKey:context.key})}),transport:'bookmark'};
  let data,downloadError;
@@ -98,13 +98,14 @@ const queue=new CaptureQueue({
   if(id&&['completed','awaiting-duplicate'].includes(job.status))try{const c=await chrome.storage.local.get(['server','key']);const r=await fetch((c.server||'http://127.0.0.1:41600')+'/media/'+id+'/thumb',{headers:{'X-Assetnest-Key':c.key,'X-Assetnest-Library':job.target?.libraryId||''},signal:AbortSignal.timeout(4000)});if(r.ok&&Number(r.headers.get('content-length')||Infinity)<524288){const b=await r.blob();if(b.size<524288)message.thumbnail=await blobData(b);}}catch{}
   await notify(message,job.items);}
   if(['running','waiting-service'].includes(job.status)){await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});await badge(job.status==='waiting-service'?'…':String(job.items.length-job.index),'#6570df');}
-  else {if(job.status==='paused'&&job.lastError?.code==='LIBRARY_CHANGED')await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});else await chrome.alarms.clear('assetnest-queue');await badge(job.status==='awaiting-duplicate'?'?':job.status==='paused'?'Ⅱ':job.failures.length?'!':job.status==='completed'?'✓':'',job.failures.length?'#cf6262':'#369875');}
-  if(['completed','cancelled'].includes(job.status)){const history=(await chrome.storage.local.get('jobHistory')).jobHistory||[];const summary={lastError:job.lastError||null,results:job.results||[],id:job.id,status:job.status,total:job.items.length,processed:job.index,added:job.added,duplicates:job.duplicates,failed:job.failures.length,updatedAt:job.updatedAt};await chrome.storage.local.set({jobHistory:[summary,...history.filter(j=>j.id!==job.id)].slice(0,20)});}
+  else {const hasFailures=job.failures.length+(job.deferredFailures?.length||0);if(job.status==='paused'&&job.lastError?.code==='LIBRARY_CHANGED')await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});else await chrome.alarms.clear('assetnest-queue');await badge(job.status==='awaiting-duplicate'?'?':job.status==='paused'?'Ⅱ':hasFailures?'!':job.status==='completed'?'✓':'',hasFailures?'#cf6262':'#369875');}
+  if(['completed','cancelled'].includes(job.status)){const history=(await chrome.storage.local.get('jobHistory')).jobHistory||[];const summary={lastError:job.lastError||null,results:job.results||[],target:job.target||null,previousJobId:job.previousJobId||null,id:job.id,status:job.status,total:job.items.length,processed:job.index,added:job.added,duplicates:job.duplicates,failed:job.failures.length+(job.deferredFailures?.length||0),updatedAt:job.updatedAt};await chrome.storage.local.set({jobHistory:[summary,...history.filter(j=>j.id!==job.id)].slice(0,20)});}
  }
 });
-async function enqueue(items){const c=await config();if(!Array.isArray(items))throw captureError('INVALID_REQUEST','采集项目需要为数组');let target=null;try{const health=await ensureLocal(c);target={server:c.server,libraryId:health.libraryId};await chrome.storage.local.set({connectedLibrary:target});}catch(e){if(!e.retryable)throw e;}return queue.enqueue(items.map(item=>({...item,tags:item.tags??(c.tags||'').split(/[,，]/).map(x=>x.trim()).filter(Boolean),folderId:item.folderId??c.folderId})),{target});}
+async function captureTarget(c,health){c.libraryId=health.libraryId;let state;try{state=await api('collector-status',c);}catch(e){if(!e.retryable)throw e;}return {server:c.server,libraryId:health.libraryId,path:state?.path||null};}
+async function enqueue(items){const c=await config();if(!Array.isArray(items))throw captureError('INVALID_REQUEST','采集项目需要为数组');let target=null;try{const health=await ensureLocal(c);target=await captureTarget(c,health);await chrome.storage.local.set({connectedLibrary:target});}catch(e){if(!e.retryable)throw e;}return queue.enqueue(items.map(item=>({...item,tags:item.tags??(c.tags||'').split(/[,，]/).map(x=>x.trim()).filter(Boolean),folderId:item.folderId??c.folderId})),{target});}
 function drain(){void queue.run().catch(async e=>{await chrome.storage.local.set({lastStatus:'后台采集异常：'+e.message});await badge('!','#cf6262');await notify({title:'后台采集异常',detail:e.message,persistent:true});});}
-async function rebindPending(job){const c=await config(),health=await ensureLocal(c);c.libraryId=health.libraryId;const data=await api('items',c);const target={server:c.server,libraryId:health.libraryId};const updated=await queue.retarget(job.id,target,data.folders.map(f=>f.id));await chrome.storage.local.set({connectedLibrary:target});drain();return updated;}
+async function rebindPending(job){const c=await config(),health=await ensureLocal(c);c.libraryId=health.libraryId;const data=await api('items',c);const target=await captureTarget(c,health);const updated=await queue.retarget(job.id,target,data.folders.map(f=>f.id));await chrome.storage.local.set({connectedLibrary:target});drain();return updated;}
 async function resumePending(){
  const previous=await queue.read();if(previous?.status==='paused'&&previous.lastError?.code==='LIBRARY_CHANGED')try{const c=await config(),state=await api('collector-status',c);if(state.recovery?.jobId===previous.id&&state.recovery.libraryId===state.libraryId&&!state.recovery.resolved){await rebindPending(previous);return;}}catch{}
 
@@ -131,8 +132,8 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
   if(m.type==='enqueue'){const job=await enqueue(m.items);drain();return job;}
   if(m.type==='job-recover'){await resumePending();return (await queue.read())||null;}
   if(m.type==='job-status'){void resumePending().catch(()=>{});return (await queue.read())||null;}
-  if(m.type==='job-control'){const previous=await queue.read();if(m.action==='resume'&&previous?.lastError?.code==='LIBRARY_CHANGED')return rebindPending(previous);const job=await queue.control(m.action);if(job.status==='running')drain();return job;}
-  if(m.type==='job-retry'){const job=await queue.retry();drain();return job;}
+  if(m.type==='job-control'){const previous=await queue.read();if(m.jobId&&previous?.id!==m.jobId)throw Error('任务状态已变化，请刷新后重试');if(m.action==='resume'&&previous?.lastError?.code==='LIBRARY_CHANGED')return rebindPending(previous);const job=await queue.control(m.action,{allRemaining:m.allRemaining===true,jobId:m.jobId});if(job.status==='running')drain();return job;}
+  if(m.type==='job-retry'){const job=await queue.retry({jobId:m.jobId,indices:m.indices});drain();return job;}
   if(m.type==='job-history')return (await chrome.storage.local.get('jobHistory')).jobHistory||[];
   throw captureError('UNKNOWN_REQUEST','未知请求');
  };

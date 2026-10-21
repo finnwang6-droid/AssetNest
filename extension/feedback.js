@@ -13,7 +13,7 @@ export function pageFeedback(message){
 export function jobFeedback(job){
  if(job.status==='awaiting-duplicate')return {title:'发现重复图片',detail:'素材库中已有相同图片。点击选择使用已有素材或保留两者。',persistent:true};
  if(job.status==='waiting-service'||job.status==='paused')return {title:'采集尚未保存',detail:job.lastError?.message||'任务已暂停，点击查看并继续。',persistent:true};
- if(job.status==='completed')return {title:job.failures.length?'采集结束，部分图片未保存':'采集完成',detail:`新增 ${job.added} 张 · 重复 ${job.duplicates} 张 · 失败 ${job.failures.length} 张。点击查看结果。`,persistent:!!job.failures.length};
+ if(job.status==='completed'){const failures=job.failures.length+(job.deferredFailures?.length||0);return {title:failures?'采集结束，部分图片未保存':'采集完成',detail:`新增 ${job.added} 张 · 重复 ${job.duplicates} 张 · 待处理失败 ${failures} 张。点击查看结果。`,persistent:!!failures};}
  if(job.status==='cancelled')return {title:'采集已取消',detail:`已处理 ${job.index} / ${job.items.length} 张，已保存素材保留。`};
  return {title:'正在保存到拾素材',detail:`正在处理 ${job.index+1} / ${job.items.length} 张，完成后会提示。`};
 }

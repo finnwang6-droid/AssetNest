@@ -32,7 +32,33 @@ test('notification failures never turn a committed capture into a failed queue',
  let stored;const q=new CaptureQueue({read:async()=>structuredClone(stored),write:async j=>stored=structuredClone(j),capture:async()=>({item:{id:'saved'},duplicate:false}),onChange:async()=>{throw Error('tab closed');}});await q.enqueue([item(1)]);await q.run();assert.equal(stored.status,'completed');assert.equal(stored.added,1);
 });
 test('retarget preserves pending images and prior results but assigns new receipts and validates folders',async()=>{
- let stored={id:'old-task',status:'paused',target:{server:'http://127.0.0.1:41600',libraryId:'old'},items:[item(0),{...item(1),folderId:'missing'},{...item(2),folderId:'valid'}],index:1,added:1,duplicates:0,failures:[],results:[{itemId:'already-saved'}],lastError:{code:'LIBRARY_CHANGED'}};const seen=[];
+ let stored={id:'old-task',status:'paused',target:{server:'http://127.0.0.1:41600',libraryId:'old'},items:[item(0),{...item(1),folderId:'missing'},{...item(2),folderId:'valid'}],index:1,added:1,duplicates:0,failures:[{item:{...item(3),folderId:'missing'}}],deferredFailures:[{item:item(4)}],results:[{itemId:'already-saved'}],lastError:{code:'LIBRARY_CHANGED'}};const seen=[];
  const q=new CaptureQueue({read:async()=>structuredClone(stored),write:async j=>stored=structuredClone(j),capture:async(i,c)=>{seen.push({i,c});return {duplicate:false};}});const target={server:'http://127.0.0.1:41600',libraryId:'current'};
- await q.retarget('old-task',target,['valid']);assert.notEqual(stored.id,'old-task');assert.equal(stored.previousJobId,'old-task');assert.equal(stored.items.length,2);assert.equal(stored.items[0].folderId,'');assert.equal(stored.items[1].folderId,'valid');assert.equal(stored.previousResults[0].itemId,'already-saved');await q.run();assert.equal(stored.added,2);assert.equal(seen[0].c.target.libraryId,'current');assert.notEqual(seen[0].c.key,'old-task:0');await assert.rejects(q.retarget('old-task',target),/状态已变化/);
+ await q.retarget('old-task',target,['valid']);assert.notEqual(stored.id,'old-task');assert.equal(stored.previousJobId,'old-task');assert.equal(stored.items.length,4);assert.equal(stored.items[0].folderId,'');assert.equal(stored.items[2].name,'Image 3');assert.equal(stored.items[2].folderId,'');assert.equal(stored.items[3].name,'Image 4');assert.equal(stored.items[1].folderId,'valid');assert.equal(stored.previousResults[0].itemId,'already-saved');await q.run();assert.equal(stored.added,4);assert.equal(seen[0].c.target.libraryId,'current');assert.notEqual(seen[0].c.key,'old-task:0');await assert.rejects(q.retarget('old-task',target),/状态已变化/);
+});
+
+test('selected failure retries retain the original destination, fresh receipts and unselected failures',async()=>{
+ const target={server:'http://127.0.0.1:41600',libraryId:'original-library',path:'D:/sample.library'},calls=[];let fail=true;
+ const {queue,get}=setup(async(i,c)=>{calls.push(c);if(fail)throw Error('temporary image failure');return {item:{id:i.name}};});
+ await queue.enqueue([item(1),item(2)],{target});await queue.run();const old=get();fail=false;
+ await assert.rejects(queue.retry({jobId:'stale',indices:[0]}),/状态已变化/);
+ await assert.rejects(queue.retry({jobId:old.id,indices:[2]}),/选择无效/);
+ await queue.retry({jobId:old.id,indices:[1]});assert.equal(get().items[0].name,'Image 2');assert.equal(get().deferredFailures[0].item.name,'Image 1');
+ await assert.rejects(queue.retry(),/先结束/);await queue.run();assert.deepEqual(calls.at(-1).target,target);assert.notEqual(calls.at(-1).key,calls[1].key);assert.equal(get().previousJobId,old.id);
+ await queue.retry();await queue.run();assert.equal(get().items[0].name,'Image 1');assert.deepEqual(get().target,target);assert.equal(get().deferredFailures.length,0);
+});
+
+test('remaining duplicate policy persists across worker restarts and does not affect the next task',async()=>{
+ let stored;const capture=async i=>i.duplicateMode?{duplicate:i.duplicateMode==='reuse'}:{duplicatePending:true,item:{id:'existing'}};
+ const make=()=>new CaptureQueue({read:async()=>structuredClone(stored),write:async j=>stored=structuredClone(j),capture});
+ const first=make();await first.enqueue([item(1),item(2)]);await first.run();await first.control('reuse',{jobId:stored.id,allRemaining:true});await first.enqueue([item(3)]);
+ await make().run();assert.equal(stored.duplicates,3);assert.equal(stored.status,'completed');
+ await first.enqueue([item(4)]);await first.run();assert.equal(stored.status,'awaiting-duplicate');assert.equal(stored.items[0].duplicateMode,undefined);
+});
+
+test('capture results persist verified destination and downloaded dimensions without inventing verification',async()=>{
+ const destination={libraryId:'lib',path:'D:/sample.library',folders:['folder']};
+ const {queue,get}=setup(async()=>({verified:true,destination,item:{id:'saved',width:2400,height:1800,size:12345}}));
+ await queue.enqueue([{...item(1),candidateSource:'srcset'}]);await queue.run();const result=get().results[0];assert.deepEqual(result.destination,destination);assert.equal(result.width,2400);assert.equal(result.height,1800);assert.equal(result.size,12345);assert.equal(result.verified,true);assert.equal(result.candidateSource,'srcset');
+ const legacy=setup(async()=>({item:{id:'legacy'}}));await legacy.queue.enqueue([item(1)]);await legacy.queue.run();assert.equal(legacy.get().results[0].verified,false);
 });
