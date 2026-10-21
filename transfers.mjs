@@ -5,6 +5,7 @@ import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {encodeZip} from './zip-stream.mjs';
 import {packExportEntries,preparePackDisk} from './eagle-pack.mjs';
+import {planFileExport,convertFileExport} from './file-export.mjs';
 
 const error=message=>Object.assign(Error(message),{status:409});
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -23,7 +24,18 @@ export class Transfers{
  startExport(ids){this.assertIdle();const entries=packExportEntries(this.catalog,ids),totalBytes=entries.reduce((n,e)=>n+e.data.length,0);this.catalog.assertSpace(totalBytes+entries.length*512);const id=crypto.randomUUID(),directory=this.directory(id),job={id,type:'export',status:'running',createdAt:Date.now(),entries:entries.length,completed:0,bytes:0,totalBytes,controller:new AbortController(),file:path.join(directory,'export.eaglepack'),token:crypto.randomBytes(24).toString('hex')};this.jobs.set(id,job);this.busy=true;
   job.promise=(async()=>{try{await pipeline(Readable.from(encodeZip(entries,{signal:job.controller.signal,onProgress:(completed,bytes)=>{job.completed=completed;job.bytes=bytes;}})),fs.createWriteStream(job.file,{flags:'wx'}),{signal:job.controller.signal});const fd=fs.openSync(job.file,'r+');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}job.bytes=fs.statSync(job.file).size;job.status='completed';}catch(e){job.status=job.controller.signal.aborted?'cancelled':'failed';job.error=e.message;this.remove(id);}finally{job.finishedAt=Date.now();job.expires=Date.now()+10*60*1000;this.busy=false;}})();return this.public(job);
  }
- public(job){return {id:job.id,type:job.type,status:job.status,createdAt:job.createdAt,finishedAt:job.finishedAt,entries:job.entries,completed:job.completed,bytes:job.bytes,totalBytes:job.totalBytes,error:job.error,...(job.status==='completed'?{download:'/download/'+job.token,expires:job.expires}:{})};}
+ startFileExport(ids,settings){
+  this.assertIdle();const plan=planFileExport(this.catalog,ids,settings);this.catalog.assertSpace(plan.options.mode==='original'?plan.totalBytes+plan.items.length*512:50*1024**2+Math.max(...plan.items.map(i=>i.data.length)));
+  const id=crypto.randomUUID(),directory=this.directory(id),job={id,type:'files-export',options:plan.options,status:'running',phase:'检查原件',createdAt:Date.now(),entries:plan.items.length,completed:0,bytes:0,totalBytes:plan.totalBytes,results:[],controller:new AbortController(),file:path.join(directory,plan.options.mode==='original'?'AssetNest-originals.zip':'AssetNest-images.zip'),token:crypto.randomBytes(24).toString('hex')};
+  this.jobs.set(id,job);this.busy=true;this.busyLabel='文件导出任务';
+  job.promise=(async()=>{try{const entries=[];for(let n=0;n<plan.items.length;n++){const item=plan.items[n];job.controller.signal.throwIfAborted();job.phase=(plan.options.mode==='original'?'准备原件：':'转换：')+item.name;try{if(plan.options.mode==='convert'){const converted=await convertFileExport(this.catalog,item,plan.options,{directory,index:n,signal:job.controller.signal});entries.push(converted);job.results.push(converted.result);}else{entries.push({name:item.output,data:item.data,hash:item.row.hash});job.results.push({name:item.output,size:item.data.length});}}catch(e){throw Error('第 '+(n+1)+' 项 '+item.name+'：'+e.message);}job.completed=n+1;await new Promise(r=>setImmediate(r));}
+   job.controller.signal.throwIfAborted();this.catalog.assertSpace(entries.reduce((n,e)=>n+e.data.length,0)+entries.length*512);job.phase='打包并校验';
+   await pipeline(Readable.from(encodeZip(entries,{signal:job.controller.signal,onProgress:(_,bytes)=>job.bytes=bytes})),fs.createWriteStream(job.file,{flags:'wx'}),{signal:job.controller.signal});
+   const fd=fs.openSync(job.file,'r+');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}job.bytes=fs.statSync(job.file).size;job.status='completed';job.phase='导出完成';
+   for(const entry of entries)if(plan.options.mode==='convert')fs.unlinkSync(entry.data.path);
+  }catch(e){job.status=job.controller.signal.aborted?'cancelled':'failed';job.error=e.message;this.remove(id);}finally{job.finishedAt=Date.now();job.expires=Date.now()+10*60*1000;this.busy=false;this.busyLabel=null;}})();return this.public(job);
+ }
+ public(job){return {id:job.id,type:job.type,status:job.status,createdAt:job.createdAt,finishedAt:job.finishedAt,entries:job.entries,completed:job.completed,bytes:job.bytes,totalBytes:job.totalBytes,error:job.error,...(job.type==='files-export'?{phase:job.phase,options:job.options,results:job.status==='completed'?job.results:[]}:{}),...(job.status==='completed'?{download:'/download/'+job.token,expires:job.expires}:{})};}
  list(){this.sweep();return {busy:this.busy,jobs:[...this.jobs.values()].reverse().map(job=>this.public(job))};}
  get(id){this.sweep();const job=this.jobs.get(id);if(!job)throw Object.assign(Error('任务已过期'),{status:404});return this.public(job);}
  cancel(id){const job=this.jobs.get(id);if(!job)throw Object.assign(Error('任务不存在'),{status:404});if(job.status==='running')job.controller.abort();else if(job.status==='completed'){this.remove(id);job.status='cancelled';}return this.public(job);}
