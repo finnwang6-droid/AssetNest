@@ -31,12 +31,14 @@ Windows x64 用户可直接下载 [0.13.1 安装包](https://github.com/finnwang
 
 [完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.13.1/AssetNest-0.13.1-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
 
+扩展追加更新：[0.6.2 修复说明](docs/extension-0.6.2.md)。0.13.1 的原安装程序和完整软件包保持原样，其中仍附带扩展 0.6.1；请另行下载并更新至扩展 0.6.2。
+
 ## 0.13.1 修复
 
 - 右键图片采集支持覆盖链接和背景图，补齐 image / link / page 菜单上下文。
 - 在点击位置定位图片，支持 iframe，并继续使用页面提供的响应式大图候选。
 - 172 项测试及独立扩展回归通过；已登录 Pinterest 首页实测尚待确认。
-- **采集扩展需更新至 0.6.1，并刷新已打开的网站页面。**详见[修复说明](docs/0.13.1.md)。
+- **采集扩展请更新至 [0.6.2](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.13.1/assetnest-extension-0.6.2.zip)，重新加载扩展后刷新已打开的网站页面。**详见[修复说明](docs/0.13.1.md)。
 - 保留 0.13.0 原件 ZIP 导出与图片转换，以下为该功能演示。
 
 ![0.13.0 原件 ZIP 导出与图片转换](docs/media/file-export-0.13.0.gif)

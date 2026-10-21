@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "拾素材 · 网页图片采集",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "右键保存图片、批量采集网页图片到本地拾素材库，保留来源、标签和文件夹。",
   "permissions": [
     "activeTab",

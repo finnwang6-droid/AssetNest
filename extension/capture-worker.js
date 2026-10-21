@@ -1,4 +1,5 @@
 import {resolveContextImage,captureMenus} from './context-image.js';
+import {installContextTracking} from './context-bootstrap.js';
 import {pageFeedback,jobFeedback} from './feedback.js';
 import {CaptureQueue} from './queue.js';
 import {scanPage} from './scanner.js';
@@ -113,7 +114,7 @@ async function resumePending(){
  const job=await queue.read();if(job&&['running','waiting-service'].includes(job.status))await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});if(job?.status==='waiting-service'){try{await ensureLocal(await config());await queue.control('resume');}catch(e){if(e.pause)await queue.mutate(async()=>{const latest=await queue.read();if(latest?.id===job.id&&latest.status==='waiting-service')await queue.save({...latest,status:'paused',lastError:{code:e.code,message:e.message,index:latest.index,pause:true},updatedAt:Date.now()});});return;}}
  const latest=await queue.read();if(latest?.status==='running'){await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});drain();}
 }
-chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>{for(const menu of captureMenus)chrome.contextMenus.create(menu);});void resumePending();});
+chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>{for(const menu of captureMenus)chrome.contextMenus.create(menu);});void installContextTracking().catch(()=>{});void resumePending();});
 chrome.runtime.onStartup.addListener(()=>{void resumePending();});
 chrome.alarms.onAlarm.addListener(a=>{if(a.name==='assetnest-queue')void resumePending();});
 export async function handleContextCapture(info,tab){
