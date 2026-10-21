@@ -1,3 +1,5 @@
+import {cachedPdfThumbnail,storePdfThumbnail} from './pdf-thumbnail.mjs';
+import {WatchFolders} from './watch-folders.mjs';
 import {MaintenanceJobs} from './maintenance-jobs.mjs';
 import {Trash} from './trash.mjs';
 import http from 'node:http';
@@ -47,6 +49,8 @@ let LIBRARY_ID=catalog.libraryId;
 let transfers=new Transfers(catalog);
 let analyzer=new FeatureAnalyzer(catalog);analyzer.schedule();
 let previews=new PreviewTasks(catalog);let trash=new Trash(catalog);let maintenance=new MaintenanceJobs(catalog,transfers);
+function makeWatchFolders(){return new WatchFolders(catalog,{blockedPaths:()=>[ROOT,path.dirname(libraries.config),...libraries.entries.map(e=>e.path)],isBusy:()=>transfers.busy,canRun:()=>!needsLocation(),onImported:row=>{previews.enqueue(row);analyzer.schedule();const meta=JSON.parse(row.metadata);recordCapture({status:'saved',name:meta.name,itemId:row.id,folders:meta.folders,libraryId:LIBRARY_ID,path:DATA,message:'监控文件夹自动入库'});}});}
+let watches=makeWatchFolders();
 const mime={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',avif:'image/avif',svg:'image/svg+xml',mp4:'video/mp4',pdf:'application/pdf',html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',ico:'image/x-icon'};
 const validID=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(s);
 const uid=()=>Date.now().toString(36).toUpperCase()+crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -91,7 +95,7 @@ export function importPack(bytes){
 }
 export function exportPack(ids=null){return encodePack(catalog,ids);}
 const needsLocation=()=>process.env.ASSETNEST_REQUIRE_LOCATION==='1'&&!libraries.locationConfirmed;
-function activate(next){void maintenance.close();analyzer.stop();void transfers.close();void previews.stop();catalog=next;db=catalog.db;DATA=catalog.root;LIBRARY_ID=catalog.libraryId;transfers=new Transfers(catalog);analyzer=new FeatureAnalyzer(catalog);analyzer.schedule();previews=new PreviewTasks(catalog);trash=new Trash(catalog);maintenance=new MaintenanceJobs(catalog,transfers);}
+function activate(next){if(next===catalog)return;void watches.stop();void maintenance.close();analyzer.stop();void transfers.close();void previews.stop();catalog=next;db=catalog.db;DATA=catalog.root;LIBRARY_ID=catalog.libraryId;transfers=new Transfers(catalog);analyzer=new FeatureAnalyzer(catalog);analyzer.schedule();previews=new PreviewTasks(catalog);trash=new Trash(catalog);maintenance=new MaintenanceJobs(catalog,transfers);watches=makeWatchFolders();}
 let pickerBusy=false;
 async function pickDirectory(){
  if(pickerBusy)throw error('文件夹选择窗口已打开',409);const helper=[path.join(ROOT,'FolderPicker.exe'),path.join(ROOT,'desktop/bin/FolderPicker.exe')].find(f=>fs.existsSync(f));if(!helper)throw error('文件夹选择器未安装，请输入完整路径');pickerBusy=true;
@@ -113,15 +117,26 @@ const server=http.createServer(async(req,res)=>{
  if(route.startsWith('/api/')){
  if(req.headers['x-assetnest-key']!==KEY)throw error('连接密钥无效，请在软件设置中复制密钥',401);
  if(origin&&!extension&&!ownOrigins.includes(origin))throw error('来源不允许',403);
- const readPost=route==='/api/collector-status'||route==='/api/search'||route==='/api/shutdown'||route.startsWith('/api/previews/')||route==='/api/cache/clear'||route.startsWith('/api/jobs/')&&route.endsWith('/cancel'),requestLibrary=LIBRARY_ID,checkLibrary=(allowBusy=false)=>{if(!allowBusy&&req.method!=='GET'&&!readPost)transfers.assertIdle();if(requestLibrary!==LIBRARY_ID||req.headers['x-assetnest-library']&&req.headers['x-assetnest-library']!==LIBRARY_ID)throw error('目标素材库已切换，请刷新后重试',409);};checkLibrary();if(req.method!=='GET'&&!readPost)transfers.assertIdle();
+ const readPost=route==='/api/collector-status'||route==='/api/search'||route==='/api/shutdown'||route.startsWith('/api/watch-folders/')||route.startsWith('/api/previews/')||route==='/api/cache/clear'||route.startsWith('/api/jobs/')&&route.endsWith('/cancel'),requestLibrary=LIBRARY_ID,checkLibrary=(allowBusy=false)=>{if(!allowBusy&&req.method!=='GET'&&!readPost)transfers.assertIdle();if(requestLibrary!==LIBRARY_ID||req.headers['x-assetnest-library']&&req.headers['x-assetnest-library']!==LIBRARY_ID)throw error('目标素材库已切换，请刷新后重试',409);};checkLibrary();if(req.method!=='GET'&&!readPost)transfers.assertIdle();
  res.once('finish',()=>{if(req.method!=='GET')analyzer.schedule();});
  if(needsLocation()&&['/api/upload','/api/capture','/api/bookmark','/api/import-pack','/api/import-confirm'].includes(route))throw error('请先在拾素材中选择素材库保存位置',409);
  if(route==='/api/search'&&req.method==='POST'){const p=await input(req);checkLibrary();let conditions=p.conditions||{};if(p.smartId){const smart=db.prepare('SELECT conditions FROM smart_folders WHERE id=?').get(p.smartId);if(!smart)throw error('智能文件夹不存在',404);conditions=JSON.parse(smart.conditions);}const result=queryItems(catalog,conditions,{page:p.page,limit:p.limit});if(p.idsOnly){const ids=searchIds(catalog,conditions);return json(res,200,{ids,total:ids.length});}return json(res,200,{...result,rows:undefined,items:result.rows.map(row=>({...parseRow(row),width:row.analyzed_width||parseRow(row).width,height:row.analyzed_height||parseRow(row).height,extractedPalette:row.extracted_palette?JSON.parse(row.extracted_palette):[],analysisStatus:row.analysis_status||'pending'}))});}
  if(route==='/api/facets'&&req.method==='GET'){catalog.refreshExternal?.();const facets=searchFacets(catalog);return json(res,200,{...facets,folders:allFolders().map(f=>({...f,count:facets.folders.find(c=>c.id===f.id)?.n||0})),smartFolders:db.prepare('SELECT * FROM smart_folders ORDER BY name,id').all().map(s=>({...s,conditions:JSON.parse(s.conditions)}))});}
  if(route==='/api/diagnostics'&&req.method==='GET')return json(res,200,diagnostics(catalog));
+ if(route==='/api/watch-folders'||route.startsWith('/api/watch-folders/')){
+  if(extension)throw error('请在拾素材客户端中管理监控文件夹',403);
+  if(route==='/api/watch-folders'&&req.method==='GET')return json(res,200,watches.status());
+  const p=await input(req);checkLibrary();
+  if(route==='/api/watch-folders'&&req.method==='POST'){if(needsLocation())throw error('请先选择素材库保存位置',409);return json(res,201,watches.add(p));}
+  const parts=route.split('/');if(parts.length===4&&req.method==='PATCH')return json(res,200,watches.configure(parts[3],p));
+  if(parts.length===4&&req.method==='DELETE')return json(res,200,watches.remove(parts[3]));
+  if(parts.length===5&&parts[4]==='retry'&&req.method==='POST')return json(res,200,watches.retry(parts[3]));
+  throw error('监控文件夹接口不存在',404);
+ }
  if(route.startsWith('/api/desktop/')&&req.method==='POST'){if(extension||process.env.ASSETNEST_DESKTOP!=='1')throw error('此操作请在桌面客户端中使用',403);const p=await input(req);checkLibrary();return json(res,200,await desktopAction(catalog,route.slice(13),p.id));}
  if(route==='/api/cache/clear'&&req.method==='POST'){if(extension)throw error('请在软件中清理缓存',403);const result=await previews.clear();checkLibrary();return json(res,200,result);}
  if(route==='/api/previews'&&req.method==='GET')return json(res,200,previews.status());
+ if(route.startsWith('/api/previews/pdf/')&&req.method==='POST'){if(extension)throw error('请在软件中生成 PDF 封面',403);const owner=catalog,previewOwner=previews,bytes=await body(req,2*1024**2);checkLibrary();return json(res,200,await storePdfThumbnail(owner,previewOwner,route.slice(18),req.headers['x-assetnest-hash'],bytes));}
  if(route==='/api/previews/settings'&&req.method==='POST'){if(extension)throw error('请在软件中设置缩略图任务',403);const p=await input(req);checkLibrary();const result=await previews.configure(p);checkLibrary();return json(res,200,result);}
  if(route==='/api/previews/retry'&&req.method==='POST'){if(extension)throw error('请在软件中重试缩略图任务',403);checkLibrary();return json(res,200,previews.retry());}
  if(route==='/api/jobs'&&req.method==='GET')return json(res,200,{...transfers.list(),jobs:[...maintenance.list(),...transfers.list().jobs]});
@@ -133,7 +148,7 @@ const server=http.createServer(async(req,res)=>{
  if(route==='/api/features'&&req.method==='GET')return json(res,200,analyzer.status());
  if(route==='/api/features/run'&&req.method==='POST'){analyzer.schedule();return json(res,200,analyzer.status());}
  if(route.startsWith('/api/similar/')&&req.method==='GET')return json(res,200,similarImages(catalog,route.slice(13),{distance:u.searchParams.get('distance')??10}));
- if(route==='/api/shutdown'&&req.method==='POST'&&process.env.ASSETNEST_DESKTOP==='1'){if(extension)throw error('仅桌面启动器可退出服务',403);analyzer.stop();await Promise.all([maintenance.close(),transfers.close(),previews.stop()]);json(res,200,{stopping:true});server.close(()=>{catalog.close();process.exit(0);});return;}
+ if(route==='/api/shutdown'&&req.method==='POST'&&process.env.ASSETNEST_DESKTOP==='1'){if(extension)throw error('仅桌面启动器可退出服务',403);analyzer.stop();await Promise.all([watches.stop(),maintenance.close(),transfers.close(),previews.stop()]);json(res,200,{stopping:true});server.close(()=>{catalog.close();process.exit(0);});return;}
 
  if(route.startsWith('/api/libraries')){
   if(extension)throw error('请在拾素材软件中管理素材库',403);
@@ -177,8 +192,10 @@ const server=http.createServer(async(req,res)=>{
   if(!['GET','HEAD'].includes(req.method))throw error('请求方法不允许',405);
   const parts=route.split('/'),row=db.prepare('SELECT * FROM items WHERE id=?').get(parts[2]);if(!row)throw error('素材不存在',404);if(!['thumb','original','preview'].includes(parts[3])||parts.length!==4)throw error('文件不存在',404);
   const meta=JSON.parse(row.metadata),kind=formatKind(meta.ext),owner=catalog,previewOwner=previews;
-  if(parts[3]==='thumb'&&!row.thumb&&!['image','raster'].includes(kind)){const icon=fs.readFileSync(path.join(ROOT,'public/file.svg'));res.writeHead(200,{'Content-Type':'image/svg+xml'});res.end(icon);return;}
-  let full;if(parts[3]==='thumb'&&!row.thumb){full=await previewOwner.thumbnail(row);if(!full&&kind==='raster'){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});res.end(fs.readFileSync(path.join(ROOT,'public/file.svg')));return;}}
+  let full=parts[3]==='thumb'&&kind==='pdf'&&!row.thumb?cachedPdfThumbnail(previewOwner,row):null;
+  if(full)res.setHeader('X-Assetnest-Pdf-Preview','1');
+  if(parts[3]==='thumb'&&!row.thumb&&!full&&!['image','raster'].includes(kind)){const icon=fs.readFileSync(path.join(ROOT,'public/file.svg'));res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});res.end(icon);return;}
+  if(parts[3]==='thumb'&&!row.thumb&&!full){full=await previewOwner.thumbnail(row);if(!full&&kind==='raster'){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});res.end(fs.readFileSync(path.join(ROOT,'public/file.svg')));return;}}
   if(!full)full=parts[3]==='preview'?await rasterPreview(owner,row):owner.path(parts[3]==='thumb'?(row.thumb||row.file):row.file);
   const unpin=previewOwner.cache.pin(full),releasePreview=()=>{unpin();if(previewOwner.alive())previewOwner.cache.enforce();};previewOwner.cache.register(full);previewOwner.cache.touch(full);res.once('finish',releasePreview);res.once('close',releasePreview);previewOwner.cache.enforce();
   const size=fs.statSync(full).size,range=byteRange(req.headers.range,size);if(range===false){res.writeHead(416,{'Content-Range':`bytes */${size}`});res.end();return;}
@@ -186,8 +203,8 @@ const server=http.createServer(async(req,res)=>{
   if(u.searchParams.has('download')||kind==='file'&&parts[3]==='original')headers['Content-Disposition']="attachment; filename*=UTF-8''"+encodeURIComponent(meta.name+'.'+meta.ext).replace(/['()]/g,c=>'%'+c.charCodeAt(0).toString(16));if(range)headers['Content-Range']=`bytes ${range.start}-${range.end}/${size}`;
   res.writeHead(range?206:200,headers);if(req.method==='HEAD')res.end();else fs.createReadStream(full,range||{}).on('error',()=>res.destroy()).pipe(res);return;
  }
- const name=route==='/'?'index.html':route.slice(1);if(!/^vendor\/pdfjs\/(?:cmaps|standard_fonts|wasm)\/[a-zA-Z0-9_.-]+\.(?:bcmap|pfb|ttf|wasm|js)$/.test(name)&&!/^vendor\/folder-icons\/[a-zA-Z0-9_-]+\.(?:png|svg)$/.test(name)&&!['maintenance-ui.js','trash.js','collector.js','collector.css','folder-drop.js','classification.css','preview-tasks.js','preview-tasks.css','folders.css','folder-icons.js','index.html','style.css','panels.css','context-menu.js','app.js','viewer.js','bookmark.svg','file.svg','favicon.ico','vendor/pdf.mjs','vendor/pdf.worker.mjs'].includes(name))throw error('文件不存在',404);const file=path.join(ROOT,'public',name);if(!fs.existsSync(file)||!fs.statSync(file).isFile())throw error('文件不存在',404);res.writeHead(200,{'Content-Type':name.endsWith('.wasm')?'application/wasm':name.endsWith('.mjs')?'text/javascript; charset=utf-8':(mime[path.extname(file).slice(1)]||'application/octet-stream'),'Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; font-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; frame-ancestors 'none'"});fs.createReadStream(file).pipe(res);
+ const name=route==='/'?'index.html':route.slice(1);if(!/^vendor\/pdfjs\/(?:cmaps|standard_fonts|wasm)\/[a-zA-Z0-9_.-]+\.(?:bcmap|pfb|ttf|wasm|js)$/.test(name)&&!/^vendor\/folder-icons\/[a-zA-Z0-9_-]+\.(?:png|svg)$/.test(name)&&!['pdf-thumbnails.js','property-inspector.js','property-inspector.css','watch-folders-ui.js','maintenance-ui.js','trash.js','collector.js','collector.css','folder-drop.js','classification.css','preview-tasks.js','preview-tasks.css','folders.css','folder-icons.js','index.html','style.css','panels.css','context-menu.js','app.js','viewer.js','bookmark.svg','file.svg','favicon.ico','vendor/pdf.mjs','vendor/pdf.worker.mjs'].includes(name))throw error('文件不存在',404);const file=path.join(ROOT,'public',name);if(!fs.existsSync(file)||!fs.statSync(file).isFile())throw error('文件不存在',404);res.writeHead(200,{'Content-Type':name.endsWith('.wasm')?'application/wasm':name.endsWith('.mjs')?'text/javascript; charset=utf-8':(mime[path.extname(file).slice(1)]||'application/octet-stream'),'Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; font-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; frame-ancestors 'none'"});fs.createReadStream(file).pipe(res);
  }catch(e){if(captureAttempt)recordCapture({...captureAttempt,status:'failed',message:String(e.message).slice(0,500)});console.error(e.message);if(!res.headersSent)json(res,e.status||400,{error:e.message});else res.end();}
 });
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))server.listen(PORT,'127.0.0.1',()=>console.log(`拾素材已启动 http://127.0.0.1:${PORT}\n素材目录：${DATA}`));
-export {server,db,DATA,catalog,previews};
+export {server,db,DATA,catalog,previews,watches};

@@ -6,7 +6,8 @@ import {durableWrite} from './storage.mjs';
 import {libraryFiles} from './local-layout.mjs';
 import {rebuildCatalog} from './rebuild.mjs';
 const spec=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));let db,lastSent=0;
-const cancelled=()=>{if(fs.existsSync(spec.cancelFile))throw Object.assign(Error('任务已取消'),{cancelled:true});};
+const parentPid=process.ppid;
+const cancelled=()=>{let parentAlive=true;try{process.kill(parentPid,0);}catch{parentAlive=false;}if(!parentAlive||fs.existsSync(spec.cancelFile))throw Object.assign(Error('任务已取消'),{cancelled:true});};
 function progress(phase,completed=0,total=0,bytes=0,totalBytes=0,force=false){cancelled();if(force||Date.now()-lastSent>100){lastSent=Date.now();process.send?.({type:'progress',phase,completed,total,bytes,totalBytes});}}
 function regular(file){const s=fs.lstatSync(file);if(s.isSymbolicLink()||!s.isFile())throw Error('任务不接受链接或特殊文件：'+file);return s;}
 function contained(root,relative){const file=path.resolve(root,relative);if(!file.startsWith(path.resolve(root)+path.sep))throw Error('文件路径越界');return file;}

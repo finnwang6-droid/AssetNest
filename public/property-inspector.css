@@ -1,0 +1,65 @@
+:root{--inspector-width:300px}
+@media(min-width:1440px){:root{--inspector-width:340px}}
+@media(max-width:1050px){:root{--inspector-width:260px}}
+@media(max-width:760px){:root{--inspector-width:230px}}
+@media(max-width:540px){:root{--inspector-width:205px}}
+.inspector-hidden{--inspector-width:0px}
+#property-panel[hidden]{display:none!important}
+.has-property-item #inspector>.inspector-content,.has-property-item #inspector>.inspector-bottom,.has-property-item #inspector>.preview-inspector{display:none!important}
+#property-panel{position:absolute;inset:43px 0 0;overflow:auto;scrollbar-width:thin;padding:7px 14px 24px;font:12px/1.6 'Segoe UI','Microsoft YaHei UI','Microsoft YaHei',sans-serif;color:#d7d7d9}
+#property-panel button,#property-picker button{font:inherit;color:inherit;cursor:pointer}
+.property-thumbnail{display:flex;justify-content:center;min-height:30px;margin:0 0 8px}
+#property-preview{position:relative;display:block;width:auto;max-width:100%;padding:0;background:transparent;border:0;border-radius:5px;overflow:hidden}
+#property-image{display:block;width:auto;max-width:100%;max-height:200px;object-fit:contain;border-radius:5px}
+#property-format{position:absolute;left:4px;top:4px;background:#48484cc9;padding:0 4px;border-radius:3px;font-size:10px;color:#fff}
+#property-palette{display:flex;justify-content:center;gap:5px;width:fit-content;max-width:100%;margin:8px auto 10px;padding:5px 7px;border:1px solid #343538;border-radius:20px}
+#property-palette[hidden]{display:none}
+#property-palette button{width:15px;height:15px;border:1px solid #ffffff13;border-radius:50%;padding:0;flex:none}
+.property-fields{display:grid;gap:8px}
+#property-panel textarea,#property-panel input{display:block;box-sizing:border-box;width:100%;min-width:0;margin:0;padding:6px 9px;border:1px solid #343538;border-radius:5px;background:#191a1c;color:#e3e3e5;font:inherit;line-height:1.65;outline:none}
+#property-panel textarea{resize:none;scrollbar-width:thin;min-height:33px}
+#property-name{font-weight:600!important}
+#property-panel textarea:focus,#property-panel input:focus{border-color:#6b7c95}
+.property-source{display:flex;border:1px solid #343538;border-radius:5px;background:#191a1c;overflow:hidden}
+#property-panel .property-source input{border:0;border-radius:0;font-weight:500;text-overflow:ellipsis}
+#property-open-source{display:flex;align-items:center;justify-content:center;flex:0 0 29px;border-left:1px solid #343538;color:#ccc;text-decoration:none;font-size:17px}
+#property-open-source[aria-disabled=true]{opacity:.35;cursor:default}
+.property-section{padding:12px 0 10px;border-top:1px solid #343538;margin-top:10px}
+#property-panel h3{font-size:12px;color:#aaa;font-weight:600;margin:0 0 8px}
+.property-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0}
+.property-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;min-width:0;padding:2px 6px;border:1px solid #48494c;border-radius:5px;background:#292a2d;line-height:1.6}
+.property-chip>span{overflow-wrap:anywhere;min-width:0}
+.property-chip button{flex:none;background:transparent;border:0;padding:0 1px;color:#a2a3a8!important;font-size:15px!important;line-height:18px}
+.property-chip button:hover{color:white!important}
+#property-add-tag{margin-top:8px}
+.property-wide{display:flex;align-items:center;justify-content:center;width:100%;min-height:28px;border:0;border-radius:5px;background:#2c2d30;padding:4px 8px}
+.property-wide:hover{background:#393b40}
+.property-add{display:inline-block;background:transparent;border:0;padding:3px 6px;margin-top:5px;font-size:17px!important;color:#aaa!important}
+#property-folders{display:inline-flex;vertical-align:middle;max-width:calc(100% - 30px)}
+.property-empty{color:#8e9096;font-size:12px}
+.property-rating{display:grid;grid-template-columns:78px 1fr;align-items:center;margin-bottom:2px}
+#property-stars{display:flex;gap:2px}
+#property-stars button{border:0;background:transparent;padding:0;color:#56575b;line-height:21px;font-size:17px}
+#property-stars button.rated,#property-stars button:hover{color:#c4c5c8}
+#property-stats{display:grid;grid-template-columns:78px minmax(0,1fr);row-gap:2px;line-height:1.6;margin:0;font-size:11px}
+#property-stats dt,#property-stats dd{margin:0;min-width:0}
+#property-stats dd{font-variant-numeric:tabular-nums;color:#b7b8bc;overflow-wrap:anywhere}
+#property-save-status{min-height:15px;font-size:10px;color:#85878d;margin:5px 0}
+#property-save-status[data-state=failed]{color:#f2a398}
+.property-more{font-size:11px;color:#8f9197;padding-top:5px}
+.property-more button{border:1px solid #444;background:#292a2d;border-radius:4px;padding:4px 8px;margin-top:7px}
+#property-picker{position:fixed;z-index:50;display:flex;flex-direction:column;background:#191a1c;border:1px solid #4b4c50;border-radius:7px;box-shadow:0 10px 35px #0008;color:#d7d7da;font:12px/1.5 'Segoe UI','Microsoft YaHei UI',sans-serif;overflow:hidden}
+#property-picker[hidden]{display:none}
+.property-picker-header{display:flex;gap:4px;padding:9px;border-bottom:1px solid #303135}
+.property-picker-header input{width:0;flex:1;min-width:0;background:transparent;color:#ddd;border:0;outline:none;padding:2px;font:inherit}
+.property-picker-header button{background:transparent;border:0;padding:2px 5px;border-radius:3px}
+.property-picker-header button[aria-pressed=true]{background:#41434a;color:#fff}
+#property-picker-options{flex:1;overflow:auto;padding:9px;align-content:start;min-height:0;scrollbar-width:thin}
+#property-picker-options.tag-options{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px}
+.property-choice{display:block;width:100%;min-width:0;text-align:left;background:transparent;border:1px solid transparent;border-radius:4px;padding:4px 7px;overflow-wrap:anywhere;margin:0}
+.property-choice.active{border-color:#56585e;background:#2d2e32}
+.property-choice[aria-selected=true]{color:#c5d6f3!important;background:#252c37}
+.property-picker-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #303135;padding:7px 9px;font-size:10px;color:#85878e}
+.property-picker-footer button{padding:0;border:0;background:transparent;color:#aaa!important}
+.property-thumbnail{position:relative}
+.pdf-thumb-status{position:absolute;bottom:5px;left:5px;right:5px;max-width:calc(100% - 10px);border:1px solid #555;border-radius:4px;background:#25262aeb;color:#ddd;font-size:10px;padding:3px 5px;z-index:2}

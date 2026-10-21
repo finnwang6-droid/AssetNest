@@ -1,10 +1,12 @@
+import {validateSource} from './property-fields.mjs';
 import {fail} from './storage.mjs';
 
 function strings(value,label){if(!Array.isArray(value)||value.length>200||value.some(v=>typeof v!=='string'||!v.trim()||v.length>1000))throw fail(label+'格式无效');return [...new Set(value)];}
 export function prepareEdit(catalog,id,patch){
  const row=catalog.row(id);if(!row)throw fail('素材不存在：'+id,404);
  const metadata=JSON.parse(row.metadata),source=catalog.source(id),disk=source?.file_metadata?JSON.parse(source.file_metadata):null,changes={};
- for(const key of ['name','tags','folders','annotation','star','isDeleted'])if(patch[key]!==undefined)changes[key]=patch[key];
+ for(const key of ['name','tags','folders','annotation','star','isDeleted','url'])if(patch[key]!==undefined)changes[key]=patch[key];
+ if(changes.url!==undefined)validateSource(changes.url);
  if(changes.name!==undefined&&(typeof changes.name!=='string'||!changes.name.trim()||changes.name.length>1000||/[\/\\\x00-\x1f]/.test(changes.name)))throw fail('素材名称无效');
  for(const key of ['tags','folders'])if(changes[key]!==undefined)changes[key]=strings(changes[key],key);
  if(changes.folders?.some(id=>!catalog.db.prepare('SELECT id FROM folders WHERE id=?').get(id)))throw fail('目标文件夹不存在');

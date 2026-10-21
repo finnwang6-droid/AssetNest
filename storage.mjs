@@ -1,3 +1,4 @@
+import {validateSource} from './property-fields.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -140,7 +141,8 @@ export class Catalog {
  updateItem(id,patch){
   const row=this.row(id);if(!row)throw fail('素材不存在',404);
   const m=JSON.parse(row.metadata),s=this.source(id),disk=s?.file_metadata?JSON.parse(s.file_metadata):null;
-  const changes={};for(const k of ['name','tags','annotation','folders','star','isDeleted','assetnestRegions'])if(patch[k]!==undefined)changes[k]=patch[k];
+  const changes={};for(const k of ['name','tags','annotation','folders','star','isDeleted','assetnestRegions','url'])if(patch[k]!==undefined)changes[k]=patch[k];
+  if(changes.url!==undefined)validateSource(changes.url);
   if(changes.assetnestRegions!==undefined){const regions=changes.assetnestRegions;if(!Array.isArray(regions)||regions.length>200||regions.some(r=>!r||!['x','y','width','height'].every(k=>typeof r[k]==='number'&&Number.isFinite(r[k]))||r.x<0||r.y<0||r.width<=0||r.height<=0||r.x+r.width>1.000001||r.y+r.height>1.000001||typeof r.text!=='string'||r.text.length>4000))throw fail('区域注释格式无效');changes.assetnestRegions=regions.map(({x,y,width,height,text})=>({x,y,width,height,text}));}
   if(changes.name!==undefined&&(typeof changes.name!=='string'||!changes.name.trim()||/[\/\\\x00]/.test(changes.name)||changes.name.length>1000))throw fail('素材名称无效');
   for(const k of ['tags','folders'])if(changes[k]!==undefined&&(!Array.isArray(changes[k])||changes[k].some(v=>typeof v!=='string')))throw fail(k+' 格式无效');
