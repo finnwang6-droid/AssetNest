@@ -1,3 +1,4 @@
+import {resolveContextImage,captureMenus} from './context-image.js';
 import {pageFeedback,jobFeedback} from './feedback.js';
 import {CaptureQueue} from './queue.js';
 import {scanPage} from './scanner.js';
@@ -112,12 +113,20 @@ async function resumePending(){
  const job=await queue.read();if(job&&['running','waiting-service'].includes(job.status))await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});if(job?.status==='waiting-service'){try{await ensureLocal(await config());await queue.control('resume');}catch(e){if(e.pause)await queue.mutate(async()=>{const latest=await queue.read();if(latest?.id===job.id&&latest.status==='waiting-service')await queue.save({...latest,status:'paused',lastError:{code:e.code,message:e.message,index:latest.index,pause:true},updatedAt:Date.now()});});return;}}
  const latest=await queue.read();if(latest?.status==='running'){await chrome.alarms.create('assetnest-queue',{periodInMinutes:.5});drain();}
 }
-chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>{for(const menu of [{id:'assetnest-save',title:'保存图片到拾素材',contexts:['image']},{id:'assetnest-bookmark',title:'收藏网页到拾素材（含画面）',contexts:['page']},{id:'assetnest-visible',title:'保存当前画面到拾素材',contexts:['page']},{id:'assetnest-region',title:'选择区域截图到拾素材',contexts:['page']}])chrome.contextMenus.create(menu);});void resumePending();});
+chrome.runtime.onInstalled.addListener(()=>{chrome.contextMenus.removeAll(()=>{for(const menu of captureMenus)chrome.contextMenus.create(menu);});void resumePending();});
 chrome.runtime.onStartup.addListener(()=>{void resumePending();});
 chrome.alarms.onAlarm.addListener(a=>{if(a.name==='assetnest-queue')void resumePending();});
-chrome.contextMenus.onClicked.addListener(async(info,tab)=>{
- try{if(!info.menuItemId.startsWith('assetnest-'))return;let item;if(info.menuItemId==='assetnest-save')item={url:info.srcUrl,website:info.pageUrl||tab.url,frameUrl:info.frameUrl||tab.url,topPageURL:tab.url,tabId:tab.id,frameId:info.frameId||0,name:tab.title||'网页图片'};else item=await screenshotItem(tab.id,info.menuItemId==='assetnest-region',info.menuItemId==='assetnest-bookmark');await enqueue([item]);drain();await chrome.storage.local.set({lastStatus:'已加入后台采集队列'});}catch(e){await reportSubmitError(e,[{tabId:tab?.id}]);await badge('!','#cf6262');}
-});
+export async function handleContextCapture(info,tab){
+ try{if(!info.menuItemId.startsWith('assetnest-'))return;let item;if(info.menuItemId==='assetnest-save'){
+ const target={tabId:tab.id,frameIds:[info.frameId||0]},frameURL=info.frameUrl||tab.url;
+ let found;try{found=(await chrome.scripting.executeScript({target,func:resolveContextImage,args:[{srcUrl:info.srcUrl,linkUrl:info.linkUrl,frameURL}]}))[0]?.result;}catch(e){if(info.srcUrl&&/^(https?:|blob:|data:image\/)/i.test(info.srcUrl))found={ok:true,url:info.srcUrl};else throw captureError('CONTEXT_IMAGE_NOT_FOUND','无法读取网页，请允许扩展访问此网站并刷新后重试');}
+ if(!found?.ok)throw captureError('CONTEXT_IMAGE_NOT_FOUND',found?.error||'无法定位右键图片，请刷新网页后重试');
+ let scanned;try{scanned=(await chrome.scripting.executeScript({target,func:scanPage}))[0]?.result;}catch{};
+ const candidate=scanned?.images.find(i=>i.currentUrl===found.url||i.candidates.some(c=>c.url===found.url));
+ item={url:info.srcUrl||candidate?.url||found.url,candidateSource:info.srcUrl?'current':candidate?.candidates?.[0]?.source||'context-menu',website:info.pageUrl||tab.url,frameUrl:frameURL,topPageURL:tab.url,tabId:tab.id,frameId:info.frameId||0,name:found.name||candidate?.name||tab.title||'网页图片'};
+ }else item=await screenshotItem(tab.id,info.menuItemId==='assetnest-region',info.menuItemId==='assetnest-bookmark');await enqueue([item]);drain();await chrome.storage.local.set({lastStatus:'已加入后台采集队列'});}catch(e){await reportSubmitError(e,[{tabId:tab?.id}]);await badge('!','#cf6262');}
+}
+chrome.contextMenus.onClicked.addListener(handleContextCapture);
 chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  if(sender.id!==chrome.runtime.id)return;
  const run=async()=>{

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "拾素材 · 网页图片采集",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "右键保存图片、批量采集网页图片到本地拾素材库，保留来源、标签和文件夹。",
   "permissions": [
     "activeTab",
@@ -32,5 +32,18 @@
     "32": "icon-32.png",
     "48": "icon-48.png",
     "128": "icon-128.png"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "context-target.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_start"
+    }
+  ]
 }

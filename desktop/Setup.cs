@@ -26,7 +26,7 @@ class Setup {
  [STAThread] static int Main(string[] args){
   bool silent=Array.Exists(args,a=>a=="/silent"),shortcuts=!Array.Exists(args,a=>a=="/no-shortcuts");string target=Path.GetFullPath(Arg(args,"/dir",Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","AssetNest"))),stage=null;
   try{
-   if(!silent&&MessageBox.Show("安装拾素材 0.13.0 到：\n"+target+"\n\n升级保留素材库和启动配置。","拾素材安装",MessageBoxButtons.OKCancel)!=DialogResult.OK)return 0;
+   if(!silent&&MessageBox.Show("安装拾素材 0.13.1 到：\n"+target+"\n\n升级保留素材库和启动配置。","拾素材安装",MessageBoxButtons.OKCancel)!=DialogResult.OK)return 0;
    if(Directory.Exists(target)&&!File.Exists(Path.Combine(target,"assetnest-install.json"))&&Directory.GetFileSystemEntries(target).Length>0)throw new Exception("安装目标不是已有拾素材安装或空目录，不覆盖其他文件。");
    if(Directory.Exists(target)&&File.Exists(Path.Combine(target,"AssetNest.exe")))StopInstalled(target);
    stage=target+".stage-"+Guid.NewGuid().ToString("N");Directory.CreateDirectory(stage);
@@ -37,7 +37,7 @@ class Setup {
    catch{published.Reverse();foreach(string relative in published){string dest=Path.Combine(target,relative),old=Path.Combine(rollback,relative);if(File.Exists(dest))File.Delete(dest);if(File.Exists(old))File.Move(old,dest);}throw;}
    finally{Cleanup(rollback);}
    string config=Path.Combine(target,"default-data.txt");if(!File.Exists(config)){string data=Path.GetFullPath(Arg(args,"/data",Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"AssetNest","Libraries","Main")));File.WriteAllText(config,data);}
-   if(shortcuts){string exe=Path.Combine(target,"AssetNest.exe"),menu=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"拾素材");Directory.CreateDirectory(menu);Shortcut(Path.Combine(menu,"拾素材.lnk"),exe);Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),"拾素材.lnk"),exe);using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\AssetNest")){key.SetValue("DisplayName","拾素材 AssetNest");key.SetValue("DisplayVersion","0.13.0");key.SetValue("InstallLocation",target);key.SetValue("UninstallString","powershell.exe -NoProfile -ExecutionPolicy Bypass -File \""+Path.Combine(target,"Uninstall.ps1")+"\"");key.SetValue("NoModify",1);key.SetValue("NoRepair",1);}}
+   if(shortcuts){string exe=Path.Combine(target,"AssetNest.exe"),menu=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"拾素材");Directory.CreateDirectory(menu);Shortcut(Path.Combine(menu,"拾素材.lnk"),exe);Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),"拾素材.lnk"),exe);using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\AssetNest")){key.SetValue("DisplayName","拾素材 AssetNest");key.SetValue("DisplayVersion","0.13.1");key.SetValue("InstallLocation",target);key.SetValue("UninstallString","powershell.exe -NoProfile -ExecutionPolicy Bypass -File \""+Path.Combine(target,"Uninstall.ps1")+"\"");key.SetValue("NoModify",1);key.SetValue("NoRepair",1);}}
    if(!silent){MessageBox.Show("安装完成。启动后可在「切换 / 管理素材库」添加已有拾素材库；不会自动搬移或删除旧库。","拾素材");Process.Start(Path.Combine(target,"AssetNest.exe"));}return 0;
   }catch(Exception e){if(!silent)MessageBox.Show(e.Message,"安装失败");else Console.Error.WriteLine(e.Message);return 1;}
   finally{if(stage!=null&&Directory.Exists(stage))Cleanup(stage);}
