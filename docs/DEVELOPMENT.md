@@ -6,6 +6,8 @@
 
 public/vendor/ 中携带 PDF.js 预览所需模块、CMaps、字体与 WASM 文件及其原始许可证。更新时从对应 pdfjs-dist 版本复制并保留所有许可证。
 
+Windows 的原生文件数据测试 `native-file-drop.test.mjs` 随主测试运行。构建安装包后，可设置 `PLAYWRIGHT_MODULE` 为 Playwright 模块位置，运行 `node tools/native-drag-browser-check.mjs`，在独立安装和素材库中验证准备、取消与失败恢复；该检查不会向聊天程序拖放或发送文件。
+
 ## Windows 原生桌面
 
 需要 Windows x64、.NET Framework C# 编译器和 WebView2 Runtime。

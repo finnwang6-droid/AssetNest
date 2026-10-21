@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
-using System.Collections.Specialized;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
@@ -21,7 +21,7 @@ class NativeWindow : Form {
  [DllImport("user32.dll")] static extern bool IsChild(IntPtr parent,IntPtr child);
  [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
  readonly string home,profile,stateFile;readonly bool testing;readonly int debugPort;WebView2 view;Label status;bool initialized,terminating;readonly JavaScriptSerializer json=new JavaScriptSerializer();
- bool fileDragging;
+ bool fileDragging,cancelFileDrag;string activeDragToken;
  public NativeWindow(string home,string profile,string stateFile,bool testing=false,int debugPort=0){
   this.home=home;this.profile=profile;this.stateFile=stateFile;this.testing=testing;this.debugPort=debugPort;json.MaxJsonLength=2*1024*1024;
   Text="拾素材 · AssetNest";Name="AssetNestNativeWindow";BackColor=Color.FromArgb(32,33,35);ForeColor=Color.Gainsboro;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);AutoScaleMode=AutoScaleMode.Dpi;MinimumSize=new Size(820,580);ClientSize=new Size(1320,820);StartPosition=FormStartPosition.CenterScreen;
@@ -36,34 +36,41 @@ class NativeWindow : Form {
  bool Own(string value){Uri uri,origin;if(!Uri.TryCreate(value,UriKind.Absolute,out uri)||!Uri.TryCreate(home,UriKind.Absolute,out origin))return false;return uri.Scheme==origin.Scheme&&uri.Host==origin.Host&&uri.Port==origin.Port&&String.IsNullOrEmpty(uri.UserInfo);}
  void External(string value){Uri uri;if(Uri.TryCreate(value,UriKind.Absolute,out uri)&&(uri.Scheme=="http"||uri.Scheme=="https")&&String.IsNullOrEmpty(uri.UserInfo))Process.Start(new ProcessStartInfo(uri.AbsoluteUri){UseShellExecute=true});}
  Dictionary<string,object> LocalJson(string route,string body=null,string key=null,string library=null){
+  var serializer=new JavaScriptSerializer{MaxJsonLength=2*1024*1024};
   var request=(HttpWebRequest)WebRequest.Create(home+route);request.Timeout=5000;request.ReadWriteTimeout=5000;request.Proxy=null;
   if(key!=null)request.Headers.Add("X-Assetnest-Key",key);if(library!=null)request.Headers.Add("X-Assetnest-Library",library);
   if(body!=null){request.Method="POST";request.ContentType="application/json";byte[] bytes=Encoding.UTF8.GetBytes(body);request.ContentLength=bytes.Length;using(var stream=request.GetRequestStream())stream.Write(bytes,0,bytes.Length);}
-  try{using(var response=request.GetResponse())using(var reader=new StreamReader(response.GetResponseStream()))return json.DeserializeObject(reader.ReadToEnd()) as Dictionary<string,object>;}
-  catch(WebException e){if(e.Response!=null)using(var reader=new StreamReader(e.Response.GetResponseStream())){var failure=json.DeserializeObject(reader.ReadToEnd()) as Dictionary<string,object>;if(failure!=null&&failure.ContainsKey("error"))throw new Exception(Convert.ToString(failure["error"]));}throw;}
+  try{using(var response=request.GetResponse())using(var reader=new StreamReader(response.GetResponseStream()))return serializer.DeserializeObject(reader.ReadToEnd()) as Dictionary<string,object>;}
+  catch(WebException e){if(e.Response!=null)using(var reader=new StreamReader(e.Response.GetResponseStream())){var failure=serializer.DeserializeObject(reader.ReadToEnd()) as Dictionary<string,object>;if(failure!=null&&failure.ContainsKey("error"))throw new Exception(Convert.ToString(failure["error"]));}throw;}
  }
- void DragMessage(string kind,string token,bool cancelled=false,string error=null){
+ void DragMessage(string kind,string token,bool cancelled=false,string error=null,string result=null,int count=0){
   if(view==null||view.IsDisposed||view.CoreWebView2==null)return;Point screen=Cursor.Position,p=view.PointToClient(screen);IntPtr hit=WindowFromPoint(screen);bool own=hit==view.Handle||IsChild(view.Handle,hit);
-  try{view.CoreWebView2.PostWebMessageAsJson(json.Serialize(new{type=kind,token,x=p.X,y=p.Y,width=view.ClientSize.Width,height=view.ClientSize.Height,atSource=own&&view.ClientRectangle.Contains(p),cancelled,error}));}catch{}
+  try{view.CoreWebView2.PostWebMessageAsJson(json.Serialize(new{type=kind,token,x=p.X,y=p.Y,width=view.ClientSize.Width,height=view.ClientSize.Height,atSource=own&&view.ClientRectangle.Contains(p),cancelled,error,result,count}));}catch{}
  }
- void DragFiles(Dictionary<string,object> message){
-  string token=message.ContainsKey("token")?Convert.ToString(message["token"]):"";bool released=false,cancelled=false,previousDrop=true;System.Windows.Forms.Timer timer=null;QueryContinueDragEventHandler query=null;
+ async void DragFiles(Dictionary<string,object> message){
+  string token=message.ContainsKey("token")?Convert.ToString(message["token"]):"";bool released=false,cancelled=false,previousDrop=true,changedDrop=false;string outcome="cancelled",failure=null;int count=0;System.Windows.Forms.Timer timer=null;QueryContinueDragEventHandler query=null;
   try{
    if(view==null||view.IsDisposed||terminating)throw new Exception("客户端已关闭");
    var ids=message.ContainsKey("ids")?message["ids"] as object[]:null;string library=message.ContainsKey("libraryId")?Convert.ToString(message["libraryId"]):"";
    Guid parsed;if(!Guid.TryParse(token,out parsed)||ids==null||ids.Length==0||ids.Length>500||String.IsNullOrEmpty(library))throw new Exception("拖拽素材参数无效");
-   var bootstrap=LocalJson("/api/bootstrap");var result=LocalJson("/api/desktop/drag-files",json.Serialize(new{ids}),Convert.ToString(bootstrap["key"]),library);
-   var values=result["files"] as object[];if(values==null||values.Length==0)throw new Exception("没有可拖出的原文件");var paths=new StringCollection();foreach(var value in values){string file=Convert.ToString(value);if(!Path.IsPathRooted(file)||!File.Exists(file))throw new Exception("原文件已丢失");paths.Add(file);}
-   var data=new DataObject();data.SetFileDropList(paths);data.SetData("Preferred DropEffect",new MemoryStream(new byte[]{1,0,0,0}));
-   previousDrop=view.AllowExternalDrop;view.AllowExternalDrop=false;
-   query=(s,e)=>{if(e.EscapePressed||terminating){cancelled=true;e.Action=DragAction.Cancel;}else if((e.KeyState&1)==0){released=true;e.Action=DragAction.Drop;}};QueryContinueDrag+=query;
+   DragMessage("native-drag-preparing",token,false,null,null,ids.Length);
+   string body=json.Serialize(new{ids});
+   var paths=await Task.Run(()=>{var bootstrap=LocalJson("/api/bootstrap");var result=LocalJson("/api/desktop/drag-files",body,Convert.ToString(bootstrap["key"]),library);return NativeFileDrag.ValidateFiles(result["files"] as object[]);});
+   count=paths.Length;
+   if(cancelFileDrag||terminating||view==null||view.IsDisposed)throw new OperationCanceledException();
+   if((Control.MouseButtons&MouseButtons.Left)==0){outcome="released-before-ready";throw new OperationCanceledException();}
+   var data=NativeFileDrag.CreateData(paths);
+   previousDrop=view.AllowExternalDrop;view.AllowExternalDrop=false;changedDrop=true;
+   query=(s,e)=>{if(e.EscapePressed||cancelFileDrag||terminating){cancelled=true;e.Action=DragAction.Cancel;}else if((e.KeyState&1)==0){released=true;e.Action=DragAction.Drop;}};QueryContinueDrag+=query;
    timer=new System.Windows.Forms.Timer{Interval=75};timer.Tick+=(s,e)=>DragMessage("native-drag-over",token);timer.Start();
-   // Standard Windows CF_HDROP, copy only. Never let a receiver move library originals.
+   DragMessage("native-drag-started",token,false,null,null,count);
    var effect=DoDragDrop(data,DragDropEffects.Copy);
-   if(testing)File.WriteAllText(Path.Combine(profile,"native-file-drag.json"),json.Serialize(new{files=values,effect=effect.ToString(),released,cancelled}));
-  }catch(Exception e){cancelled=true;DragMessage("native-drag-finished",token,true,e.Message);return;}
-  finally{if(timer!=null){timer.Stop();timer.Dispose();}if(query!=null)QueryContinueDrag-=query;if(view!=null&&!view.IsDisposed)view.AllowExternalDrop=previousDrop;fileDragging=false;}
-  DragMessage("native-drag-finished",token,cancelled||!released);
+   cancelled=cancelled||!released;outcome=cancelled?"cancelled":effect==DragDropEffects.Copy?"accepted":"not-accepted";
+   if(testing)File.WriteAllText(Path.Combine(profile,"native-file-drag.json"),json.Serialize(new{files=paths,effect=effect.ToString(),released,cancelled,result=outcome}));
+  }catch(OperationCanceledException){cancelled=true;}
+  catch(Exception e){cancelled=true;failure=e.Message;outcome="error";}
+  finally{if(timer!=null){timer.Stop();timer.Dispose();}if(query!=null)QueryContinueDrag-=query;if(changedDrop&&view!=null&&!view.IsDisposed)try{view.AllowExternalDrop=previousDrop;}catch{}fileDragging=false;activeDragToken=null;cancelFileDrag=false;}
+  DragMessage("native-drag-finished",token,cancelled,failure,outcome,count);
  }
  async void Initialize(){
   if(initialized)return;initialized=true;
@@ -77,7 +84,7 @@ class NativeWindow : Form {
    core.NavigationStarting+=(s,e)=>{if(!Own(e.Uri)){e.Cancel=true;if(e.IsUserInitiated)External(e.Uri);}};
    core.NewWindowRequested+=(s,e)=>{e.Handled=true;if(e.IsUserInitiated)External(e.Uri);};
    core.PermissionRequested+=(s,e)=>{e.State=Own(e.Uri)&&e.PermissionKind==CoreWebView2PermissionKind.ClipboardRead?CoreWebView2PermissionState.Allow:CoreWebView2PermissionState.Deny;e.Handled=true;};
-   core.WebMessageReceived+=(s,e)=>{if(testing)File.WriteAllText(Path.Combine(profile,"native-message.json"),json.Serialize(new{source=e.Source,trusted=Own(e.Source),message=e.WebMessageAsJson}));if(!Own(e.Source))return;try{var m=json.DeserializeObject(e.WebMessageAsJson) as System.Collections.Generic.Dictionary<string,object>;if(m==null||!m.ContainsKey("type"))return;string kind=Convert.ToString(m["type"]);if(kind=="drag-files"){if(!fileDragging){fileDragging=true;BeginInvoke(new Action(()=>DragFiles(m)));}}else if(kind=="minimize")WindowState=FormWindowState.Minimized;else if(kind=="maximize")WindowState=WindowState==FormWindowState.Maximized?FormWindowState.Normal:FormWindowState.Maximized;else if(kind=="close")Close();}catch(Exception failure){if(testing)File.WriteAllText(Path.Combine(profile,"native-message-error.txt"),failure.ToString());}};
+   core.WebMessageReceived+=(s,e)=>{if(testing)File.WriteAllText(Path.Combine(profile,"native-message.json"),json.Serialize(new{source=e.Source,trusted=Own(e.Source),message=e.WebMessageAsJson}));if(!Own(e.Source))return;try{var m=json.DeserializeObject(e.WebMessageAsJson) as System.Collections.Generic.Dictionary<string,object>;if(m==null||!m.ContainsKey("type"))return;string kind=Convert.ToString(m["type"]);if(kind=="cancel-file-drag"){if(fileDragging&&m.ContainsKey("token")&&Convert.ToString(m["token"])==activeDragToken)cancelFileDrag=true;}else if(kind=="drag-files"){if(!fileDragging){fileDragging=true;cancelFileDrag=false;activeDragToken=m.ContainsKey("token")?Convert.ToString(m["token"]):"";BeginInvoke(new Action(()=>DragFiles(m)));}else DragMessage("native-drag-finished",m.ContainsKey("token")?Convert.ToString(m["token"]):"",true,"上一项拖拽仍在结束，请稍后重试","error");}else if(kind=="minimize")WindowState=FormWindowState.Minimized;else if(kind=="maximize")WindowState=WindowState==FormWindowState.Maximized?FormWindowState.Normal:FormWindowState.Maximized;else if(kind=="close")Close();}catch(Exception failure){if(testing)File.WriteAllText(Path.Combine(profile,"native-message-error.txt"),failure.ToString());}};
    core.DownloadStarting+=(s,e)=>{
     string uri=e.DownloadOperation.Uri;if(!Own(uri)&&!(uri.StartsWith("blob:")&&Own(uri.Substring(5)))){e.Cancel=true;return;}
     string suggested=Path.GetFileName(e.ResultFilePath);if(String.IsNullOrEmpty(suggested))suggested="AssetNest.eaglepack";
@@ -86,7 +93,7 @@ class NativeWindow : Form {
     e.Handled=true;var deferral=e.GetDeferral();BeginInvoke(new Action(()=>{try{using(var dialog=new SaveFileDialog{Title="保存文件",FileName=suggested,Filter=filter,OverwritePrompt=true}){if(dialog.ShowDialog(this)==DialogResult.OK)e.ResultFilePath=dialog.FileName;else e.Cancel=true;}}catch{e.Cancel=true;}finally{deferral.Complete();}}));
    };
    core.ProcessFailed+=(s,e)=>{if(e.ProcessFailedKind==CoreWebView2ProcessFailedKind.BrowserProcessExited||e.ProcessFailedKind==CoreWebView2ProcessFailedKind.RenderProcessExited){status.Text="界面进程已退出。素材保存在原位置，请关闭窗口后从托盘重新打开。";view.Dispose();Controls.Remove(view);view=null;initialized=false;status.BringToFront();}};
-   await core.AddScriptToExecuteOnDocumentCreatedAsync("if(location.origin==="+json.Serialize(home)+"){Object.defineProperty(window,'assetnestDesktop',{value:Object.freeze({host:'webview2',version:'0.10.2',fileDrag:true})});}");
+   await core.AddScriptToExecuteOnDocumentCreatedAsync("if(location.origin==="+json.Serialize(home)+"){Object.defineProperty(window,'assetnestDesktop',{value:Object.freeze({host:'webview2',version:'0.10.3',fileDrag:true})});}");
    core.NavigationCompleted+=(s,e)=>{if(e.IsSuccess)status.Visible=false;else{status.Text="界面加载失败，请关闭窗口后从托盘重新打开。";status.Visible=true;status.BringToFront();initialized=false;}};
    core.Navigate(home);
    if(testing)File.WriteAllText(Path.Combine(profile,"native-host.json"),json.Serialize(new{host="webview2",runtime=environment.BrowserVersionString,defaultContextMenus=settings.AreDefaultContextMenusEnabled,devTools=settings.AreDevToolsEnabled,browserAccelerators=settings.AreBrowserAcceleratorKeysEnabled,statusBar=settings.IsStatusBarEnabled,handle=Handle.ToInt64(),processId=Process.GetCurrentProcess().Id,title=Text}));

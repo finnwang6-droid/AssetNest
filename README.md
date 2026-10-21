@@ -1,10 +1,10 @@
 # 拾素材 · AssetNest
 
-本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前服务版本 0.10.2。无需云端账号，素材和索引保存在本机。
+本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前服务版本 0.10.3。无需云端账号，素材和索引保存在本机。
 
 ## 界面与操作演示
 
-浏览素材 → 搜索 → 大图预览 → 多文件夹归类。以下演示录于 0.9.0，使用 24 张原创示例素材，本机路径已遮盖；0.10.2 已更新属性栏，详见[版本说明](docs/0.10.2.md)。
+浏览素材 → 搜索 → 大图预览 → 多文件夹归类。以下演示录于 0.9.0，使用 24 张原创示例素材，本机路径已遮盖；0.10.3 已更新属性栏，详见[版本说明](docs/0.10.3.md)。
 
 ![AssetNest 操作演示：浏览、搜索、预览和分类](docs/media/assetnest-demo.gif)
 
@@ -27,17 +27,16 @@
 
 ## 下载安装
 
-Windows x64 用户可直接下载 [0.10.2 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.10.2/AssetNest-Setup-0.10.2.exe)，无需安装 Node.js。
+Windows x64 用户可直接下载 [0.10.3 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.10.3/AssetNest-Setup-0.10.3.exe)，无需安装 Node.js。
 
-[完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.10.2/AssetNest-0.10.2-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
+[完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.10.3/AssetNest-0.10.3-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
 
-## 0.10.2 更新
+## 0.10.3 更新
 
-- Windows 桌面版支持将单张或多选素材的原文件直接拖到支持接收文件的软件；仅复制，不移动原件，应用内拖到文件夹归类仍可用。见[拖出原文件说明](docs/0.10.2.md)。
-- 网格与大图预览共用属性栏；支持搜索标签与文件夹、直接评分、自动保存名称/注释/来源和导出原文件。
-- PDF 列表和属性栏支持首页封面缓存，保留原件与原始元数据。
-- 监控文件夹自动复制入库，支持分类与标签、暂停、继续和失败重试。
-- 浏览器采集扩展继续使用 0.5.5。
+- 拖拽文件后台准备，支持准备阶段取消，提前松开不再启动拖放。
+- 区分接收、拒收和取消；缺失原件指出具体素材，过长路径提供处理建议。
+- 改进多选、中文长文件名、同名文件和失败后的恢复。145 项公开版测试通过，QQ／微信接收获用户实测通过反馈。
+- 保留原文件跨软件拖拽、属性栏、PDF 封面和监控文件夹。详见[版本说明](docs/0.10.3.md)。
 
 ## 功能
 
