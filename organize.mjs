@@ -16,7 +16,7 @@ export function prepareEdit(catalog,id,patch){
  changes.lastModified=Date.now();Object.assign(metadata,changes);if(disk)Object.assign(disk,changes);
  return {row:{...row,metadata:JSON.stringify(metadata)},source:{file_metadata:disk?JSON.stringify(disk):null,pack_id:source?.pack_id??null}};
 }
-export function batchEdit(catalog,p){
+export function prepareBatchEdit(catalog,p){
  if(!Array.isArray(p.ids)||!p.ids.length||p.ids.length>500||new Set(p.ids).size!==p.ids.length)throw fail('请选择 1～500 个不同素材');
  const addTags=p.addTags===undefined?[]:strings(p.addTags,'标签'),removeTags=p.removeTags===undefined?[]:strings(p.removeTags,'标签');
  const plans=p.ids.map((id,index)=>{
@@ -25,13 +25,15 @@ export function batchEdit(catalog,p){
   if(p.folderMode){if(!['add','replace','remove'].includes(p.folderMode))throw fail('文件夹操作无效');const folders=strings(p.folders||[],'文件夹');patch.folders=p.folderMode==='replace'?folders:p.folderMode==='add'?[...new Set([...(current.folders||[]),...folders])]:(current.folders||[]).filter(f=>!folders.includes(f));}
   if(p.rename){if(typeof p.rename.template!=='string'||!p.rename.template.trim())throw fail('改名模板不能为空');const start=p.rename.start??1;if(!Number.isInteger(start)||start<0||start>1000000)throw fail('编号起点无效');patch.name=p.rename.template.replace(/\{name\}/g,()=>current.name).replace(/\{n\}/g,String(start+index));}
   return prepareEdit(catalog,id,patch);
- });catalog.commit({items:plans});return {updated:plans.length,ids:p.ids};
+ });return plans;
 }
-export function manageTag(catalog,{from,to=null}){
+export function batchEdit(catalog,p){const plans=prepareBatchEdit(catalog,p);catalog.commit({items:plans});return {updated:plans.length,ids:p.ids};}
+export function prepareTagEdit(catalog,{from,to=null}){
  if(typeof from!=='string'||!from.trim()||to!==null&&(typeof to!=='string'||!to.trim()||to.length>1000))throw fail('标签名称无效');
  const plans=catalog.db.prepare('SELECT id,metadata FROM items').all().filter(r=>(JSON.parse(r.metadata).tags||[]).includes(from)).map(r=>prepareEdit(catalog,r.id,{tags:[...new Set(JSON.parse(r.metadata).tags.flatMap(t=>t===from?(to===null?[]:[to]):[t]))]}));
- if(plans.length)catalog.commit({items:plans});return {updated:plans.length};
+ return plans;
 }
+export function manageTag(catalog,p){const plans=prepareTagEdit(catalog,p);if(plans.length)catalog.commit({items:plans});return {updated:plans.length};}
 export function editFolder(catalog,id,p){
  const folders=catalog.folders().map(f=>({id:f.id,parentId:f.parent_id,raw:JSON.parse(f.metadata)})),target=folders.find(f=>f.id===id);if(!target)throw fail('文件夹不存在',404);
  if(p.name!==undefined){if(typeof p.name!=='string'||!p.name.trim()||p.name.length>200||/[\x00-\x1f]/.test(p.name))throw fail('文件夹名称无效');target.raw.name=p.name.trim();}

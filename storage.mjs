@@ -39,7 +39,8 @@ export class Catalog {
     CREATE TABLE IF NOT EXISTS committed_transactions(id TEXT PRIMARY KEY,committed_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS import_reports(id TEXT PRIMARY KEY,report TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS capture_receipts(key TEXT PRIMARY KEY,request_hash TEXT NOT NULL,result TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS purged_receipts(key TEXT PRIMARY KEY,purged_at INTEGER NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS purged_receipts(key TEXT PRIMARY KEY,purged_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS organization_history(slot INTEGER PRIMARY KEY CHECK(slot=1),entry TEXT NOT NULL);`);
    this.recovery=this.recover();this.migrateLegacy();setupSearch(this.db);
    if(!external&&libraryFiles.some(name=>!fs.existsSync(path.join(this.root,name)))){const inject=this.fault;this.fault=()=>{};try{this.commit({});}finally{this.fault=inject;}}
   }catch(e){this.close();throw e;}
@@ -91,7 +92,7 @@ export class Catalog {
  folders(){return this.db.prepare('SELECT f.*,i.parent_id FROM folders f LEFT JOIN folder_index i ON f.id=i.id').all();}
  allocate(reserved=new Set()){let id;do{id=newId();}while(reserved.has(id)||this.row(id)||fs.existsSync(path.join(this.images,id+'.info')));reserved.add(id);return id;}
  commit(plan){const release=this.beforeCommit?.();try{const result=this.commitPlan(plan);try{this.afterCommit?.();}catch(e){this.blocked='写入已完成，但外部库状态更新失败，请重新打开素材库：'+e.message;}return result;}finally{release?.();}}
- commitPlan({items=[],folders=[],deleteFolders=[],deleteItems=[],pack=null,packs=[],report=null,receipt=null}){
+ commitPlan({items=[],folders=[],deleteFolders=[],deleteItems=[],pack=null,packs=[],report=null,receipt=null,organization=null}){
   if(this.blocked)throw fail('素材库恢复未完成，已暂停写入：'+this.blocked,503);
   const id=crypto.randomUUID(),tx=path.join(this.transactions,id);let committed=false;let begun=false;
   const renames=new Map();items=items.map(item=>{const previous=this.row(item.row.id);if(!previous||item.files)return item;const before=JSON.parse(previous.metadata),after=JSON.parse(item.row.metadata);if(before.name===after.name)return item;const name=assetName(after.name,this.root,after.id,after.ext);if(name!==after.name)throw fail('素材名称包含无效字符、保留名称或超出本地路径长度');const file=after.id+'.info/'+name+'.'+after.ext,thumb=item.row.thumb?after.id+'.info/'+name+'_thumbnail.png':null;renames.set(after.id,{fromFile:path.basename(previous.file),toFile:path.basename(file),fromThumb:previous.thumb?path.basename(previous.thumb):null,toThumb:thumb?path.basename(thumb):null});return {...item,row:{...item.row,file,thumb}};});
@@ -120,11 +121,13 @@ export class Catalog {
    }
    for(const item of items){const r=item.row,s=item.source;this.db.prepare('INSERT INTO items VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata,file=excluded.file,thumb=excluded.thumb,hash=excluded.hash').run(r.id,r.metadata,r.file,r.thumb,r.hash);this.db.prepare('INSERT INTO item_sources VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET file_metadata=excluded.file_metadata,pack_id=excluded.pack_id').run(r.id,s?.file_metadata??null,s?.pack_id??null);}
    for(const id of deleteItems){for(const table of ['items','item_sources','search_docs','image_features','preview_tasks'])if(this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table))this.db.prepare('DELETE FROM '+table+' WHERE id=?').run(id);this.db.prepare("INSERT OR IGNORE INTO purged_receipts SELECT key,? FROM capture_receipts WHERE json_extract(result,'$.itemId')=?").run(Date.now(),id);this.db.prepare("DELETE FROM capture_receipts WHERE json_extract(result,'$.itemId')=?").run(id);}
+   if(deleteItems.length){const entry=this.db.prepare('SELECT entry FROM organization_history WHERE slot=1').get();if(entry&&JSON.parse(entry.entry).before.some(s=>deleteItems.includes(s.row.id)))this.db.prepare('DELETE FROM organization_history').run();}
    for(const f of folders){this.db.prepare('INSERT INTO folders VALUES(?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata').run(f.id,JSON.stringify(f.raw));this.db.prepare('INSERT INTO folder_index VALUES(?,?) ON CONFLICT(id) DO UPDATE SET parent_id=excluded.parent_id').run(f.id,f.parentId??null);}
    for(const id of deleteFolders){this.db.prepare('DELETE FROM folder_index WHERE id=?').run(id);this.db.prepare('DELETE FROM folders WHERE id=?').run(id);}
    for(const p of pack?[...packs,pack]:packs)this.db.prepare('INSERT INTO packs VALUES(?,?)').run(p.id,JSON.stringify(p.envelope));
    if(report)this.db.prepare('INSERT INTO import_reports VALUES(?,?)').run(report.id,JSON.stringify(report));
    if(receipt)this.db.prepare('INSERT INTO capture_receipts VALUES(?,?,?)').run(receipt.key,receipt.requestHash,JSON.stringify(receipt.result));
+   if(organization){if(organization.clear)this.db.prepare('DELETE FROM organization_history').run();else this.db.prepare('INSERT OR REPLACE INTO organization_history VALUES(1,?)').run(JSON.stringify({...organization,after:items.map(i=>({row:this.row(i.row.id),source:this.source(i.row.id)}))}));}
    for(const item of items)syncDocument(this.db,item.row);
    for(const [name,value]of Object.entries(rootDocuments(this,items,deleteItems)))durableWrite(path.join(tx,'root-staged',name),JSON.stringify(value));
    if(this.transactionGuard){manifest.externalGuard=this.transactionGuard('roots',manifest,tx);durableWrite(path.join(tx,'manifest.tmp'),JSON.stringify(manifest));fs.renameSync(path.join(tx,'manifest.tmp'),path.join(tx,'manifest.json'));}this.beforePublish?.(true);
