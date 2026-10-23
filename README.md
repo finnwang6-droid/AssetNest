@@ -1,10 +1,10 @@
 # 拾素材 · AssetNest
 
-本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前服务版本 0.13.1。无需云端账号，素材和索引保存在本机。
+本地优先的素材管理工具，包含 Windows 桌面客户端与 Chrome / Edge 网页采集扩展。当前源码版本 0.14.4。无需云端账号，素材和索引保存在本机。
 
 ## 界面与操作演示
 
-浏览素材 → 搜索 → 大图预览 → 多文件夹归类。以下演示录于 0.9.0，使用 24 张原创示例素材，本机路径已遮盖；新版功能详见[版本说明](docs/0.13.1.md)。
+浏览素材 → 搜索 → 大图预览 → 多文件夹归类。以下演示录于 0.9.0，使用 24 张原创示例素材，本机路径已遮盖；新版功能详见[版本说明](docs/0.14.4.md)。
 
 ![AssetNest 操作演示：浏览、搜索、预览和分类](docs/media/assetnest-demo.gif)
 
@@ -27,11 +27,15 @@
 
 ## 下载安装
 
-Windows x64 用户可直接下载 [0.13.1 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.13.1/AssetNest-Setup-0.13.1.exe)，无需安装 Node.js。
+Windows x64 用户可直接下载 [0.14.4 安装包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.14.4/AssetNest-Setup-0.14.4.exe)，无需安装 Node.js。
 
-[完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.13.1/AssetNest-0.13.1-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
+[完整软件与扩展包](https://github.com/finnwang6-droid/AssetNest/releases/download/v0.14.4/AssetNest-0.14.4-Windows-x64.zip)包含安装程序、可加载的浏览器扩展目录与安装说明。更多下载及 SHA-256 校验文件见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/latest)。桌面窗口需要 Microsoft Edge WebView2 Runtime；安装包尚未进行代码签名。
 
-扩展追加更新：[0.6.2 修复说明](docs/extension-0.6.2.md)。0.13.1 的原安装程序和完整软件包保持原样，其中仍附带扩展 0.6.1；请另行下载并更新至扩展 0.6.2。
+本次软件和完整软件包均附带采集扩展 0.6.2；扩展单独下载见 [Releases](https://github.com/finnwang6-droid/AssetNest/releases/tag/v0.14.4)。已有旧扩展的用户请重新加载并刷新网站页面。
+
+本版新增可视化智能文件夹规则、视频封面与静音悬停播放、鼠标框选多选和图片框选放大，详见 [0.14.0 功能说明](docs/0.14.0.md)。
+
+0.14.1 新增本地文件夹拖入：自动创建同名目录并保留子目录，重复素材归类到对应文件夹，原件不移动。
 
 ## 0.13.1 修复
 
@@ -89,3 +93,9 @@ npm test
 ## 许可证
 
 项目原创代码与自绘资源采用 [MIT](LICENSE)。第三方资源保留原许可证，见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+
+0.14.2 新增 GitHub 正式版更新检测：启动后每天自动检查一次，也可从菜单手动检查、关闭自动检查或忽略版本。[使用说明](docs/0.14.2.md)。
+
+0.14.3 修复静止界面每 15 秒重建缩略图导致闪烁的问题；数据未变化时保留图片节点和选择状态，新增素材、修改资料仍会自动更新。
+
+0.14.4 文件夹导航默认包含所有子级素材，父级不再因没有直接归属素材而显示为空；侧栏数量递归统计并去重。

@@ -1,0 +1,4 @@
+export const smartFields={
+ name:['名称','text'],ext:['格式','text'],tags:['标签','text'],folder:['文件夹','folder'],folderName:['文件夹名','text'],filename:['文件名','text'],color:['颜色','color'],dateAdded:['添加日期','date'],dateModified:['修改日期','date'],dateCreated:['创建日期','date'],url:['链接','text'],annotation:['注释','text'],width:['宽度','number'],height:['高度','number'],size:['文件大小','number'],shape:['形状','shape'],rating:['评分','number'],star:['标注','boolean'],duration:['时长','number']
+};
+export const smartOperators={folder:[['eq','包含文件夹'],['ne','不在文件夹'],['empty','未分类'],['notEmpty','已分类']],text:[['contains','包含'],['notContains','不包含'],['startsWith','开头为'],['endsWith','结尾为'],['eq','相等'],['empty','没有内容'],['notEmpty','有内容'],['regex','正则表达式']],number:[['eq','等于'],['ne','不等于'],['gt','大于'],['gte','大于等于'],['lt','小于'],['lte','小于等于']],date:[['eq','当天'],['lt','早于'],['gt','晚于']],color:[['eq','接近颜色'],['ne','不接近颜色']],shape:[['eq','是'],['ne','不是']],boolean:[['eq','是'],['ne','不是']]};

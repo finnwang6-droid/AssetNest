@@ -12,7 +12,7 @@ export async function openViewer(item,{saveRegions,onError}){
  const note=document.createElement('p');note.className='viewer-note';area.append(note);
  try{
   if(['mp4','webm','ogv','mov','mp3','wav','ogg','oga','m4a','aac','flac','opus'].includes(ext)){
-   const video=['mp4','webm','ogv','mov'].includes(ext),media=document.createElement(video?'video':'audio');media.id='asset-media';media.controls=true;media.preload='metadata';media.src=url;area.prepend(media);note.textContent='使用浏览器支持的编码播放；可拖动进度、调节音量。';media.onerror=()=>note.textContent='浏览器无法播放此编码，请下载原文件，用本地播放器打开。';dispose=()=>{media.pause();media.removeAttribute('src');media.load();};return;
+   const video=['mp4','webm','ogv','mov'].includes(ext),media=document.createElement(video?'video':'audio');media.id='asset-media';media.controls=true;media.preload='metadata';media.src=url;if(video){media.muted=media.defaultMuted=true;media.playsInline=true;media.loop=true;media.onpointerenter=()=>void media.play().catch(()=>{});media.onpointerleave=()=>media.pause();}area.prepend(media);note.textContent=video?'悬停静音播放，移开暂停；可拖动进度。':'使用浏览器支持的编码播放；可拖动进度、调节音量。';media.onerror=()=>note.textContent='浏览器无法播放此编码，请下载原文件，用本地播放器打开。';dispose=()=>{media.onpointerenter=media.onpointerleave=null;media.pause();media.removeAttribute('src');media.load();};return;
   }
   if(ext==='pdf'){
    note.textContent='正在读取 PDF…';const pdfjs=await import('/vendor/pdf.mjs');if(token!==generation)return;pdfjs.GlobalWorkerOptions.workerSrc='/vendor/pdf.worker.mjs';

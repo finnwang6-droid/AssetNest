@@ -3,7 +3,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-export const managedPreview=/^[a-f0-9]{64}(?:\.psd-v1(?:\.thumb)?|\.pdf-v1\.thumb|\.thumb-v1)?\.png$/;
+export const managedPreview=/^[a-f0-9]{64}(?:\.psd-v1(?:\.thumb)?|\.(?:pdf|video)-v1\.thumb|\.thumb-v1)?\.png$/;
 const extensions=['jpg','jpeg','png','gif','webp','avif','svg','tif','tiff','psd'];
 const error=message=>Object.assign(Error(message),{status:400});
 export class PreviewCache{
