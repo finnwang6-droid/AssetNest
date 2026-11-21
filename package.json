@@ -1,6 +1,6 @@
 {
   "name": "assetnest-local",
-  "version": "0.14.4",
+  "version": "0.14.5",
   "private": true,
   "type": "module",
   "description": "Local asset library and browser collector with Eagle pack compatibility",
