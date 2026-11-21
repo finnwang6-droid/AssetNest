@@ -131,6 +131,7 @@ chrome.contextMenus.onClicked.addListener(handleContextCapture);
 chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  if(sender.id!==chrome.runtime.id)return;
  const run=async()=>{
+   if(m.type==='open-desktop'){const c=await config();await api('desktop/show',c,{method:'POST'});return true;}
    if(m.type==='open-results'){await openResults();return true;}
    if(m.type==='duplicate-preview'){const job=await queue.read();if(!job?.duplicate)throw Error('没有待处理的重复图片');const c=await config();c.libraryId=job.target?.libraryId;const r=await fetch(c.server+'/media/'+job.duplicate.existing.id+'/thumb',{headers:{'X-Assetnest-Key':c.key,'X-Assetnest-Library':c.libraryId},signal:AbortSignal.timeout(10000)});if(!r.ok)return null;return blobData(await r.blob());}
    if(m.type==='auto-connect'){const saved=await chrome.storage.local.get('server');await autoConnect(m.server||saved.server||'http://127.0.0.1:41600');return {connected:true};}

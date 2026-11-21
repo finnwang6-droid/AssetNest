@@ -31,7 +31,7 @@ class Launcher : Form {
  void StartService(){
   if(Health()){AttachExisting();return;}
   Directory.CreateDirectory(data);
-  var info=new ProcessStartInfo(Path.Combine(root,"runtime","node.exe"),"\""+Path.Combine(root,"app","server.mjs")+"\"");info.WorkingDirectory=Path.Combine(root,"app");info.UseShellExecute=false;info.CreateNoWindow=true;info.RedirectStandardError=true;info.RedirectStandardOutput=true;info.EnvironmentVariables["ASSETNEST_DATA"]=data;info.EnvironmentVariables["ASSETNEST_PORT"]=port.ToString();info.EnvironmentVariables["ASSETNEST_DESKTOP"]="1";info.EnvironmentVariables["ASSETNEST_REQUIRE_LOCATION"]="1";
+  var info=new ProcessStartInfo(Path.Combine(root,"runtime","node.exe"),"\""+Path.Combine(root,"app","server.mjs")+"\"");info.WorkingDirectory=Path.Combine(root,"app");info.UseShellExecute=false;info.CreateNoWindow=true;info.RedirectStandardError=true;info.RedirectStandardOutput=true;info.EnvironmentVariables["ASSETNEST_DATA"]=data;info.EnvironmentVariables["ASSETNEST_PORT"]=port.ToString();info.EnvironmentVariables["ASSETNEST_DESKTOP"]="1";info.EnvironmentVariables["ASSETNEST_REQUIRE_LOCATION"]="0";
   owned=new Process();owned.StartInfo=info;string log=Path.Combine(data,"desktop-server.log");owned.ErrorDataReceived+=(s,e)=>{if(e.Data!=null)try{File.AppendAllText(log,e.Data+Environment.NewLine);}catch{}};owned.OutputDataReceived+=(s,e)=>{};owned.Start();owned.BeginErrorReadLine();owned.BeginOutputReadLine();
   for(int n=0;n<80;n++){if(Health())return;if(owned.HasExited)break;Thread.Sleep(100);}throw new Exception("本地服务启动失败，请查看 "+log+"。可能已有其他版本占用端口。");
  }
@@ -53,7 +53,7 @@ class Launcher : Form {
  void Quit(){if(nativeWindow!=null){nativeWindow.Shutdown();nativeWindow=null;}if(hotkey){UnregisterHotKey(Handle,1);hotkey=false;}if(timer!=null){timer.Dispose();timer=null;}if(tray!=null){tray.Visible=false;tray.Dispose();tray=null;}if(showEvent!=null){showEvent.Dispose();showEvent=null;}if(stopEvent!=null){stopEvent.Dispose();stopEvent=null;}StopOwned();Application.ExitThread();}
  protected override void OnFormClosed(FormClosedEventArgs e){Quit();base.OnFormClosed(e);}
  [STAThread] static int Main(string[] args){
-  SetProcessDPIAware();Application.EnableVisualStyles();string port=Arg(args,"/port","41600");if(Flag(args,"/stop")){try{using(var ev=EventWaitHandle.OpenExisting("Local\\AssetNest.Stop."+port))ev.Set();return 0;}catch{return 1;}}
+  SetProcessDPIAware();Application.EnableVisualStyles();string port=Arg(args,"/port","41600");if(Flag(args,"/show")){try{using(var ev=EventWaitHandle.OpenExisting("Local\\AssetNest.Show."+port))ev.Set();return 0;}catch{return 1;}}if(Flag(args,"/stop")){try{using(var ev=EventWaitHandle.OpenExisting("Local\\AssetNest.Stop."+port))ev.Set();return 0;}catch{return 1;}}
   bool first;using(var mutex=new Mutex(true,"Local\\AssetNest.Desktop."+port,out first)){if(!first){if(!Flag(args,"/background"))try{using(var ev=EventWaitHandle.OpenExisting("Local\\AssetNest.Show."+port))ev.Set();}catch{}return 0;}Launcher app=null;try{app=new Launcher(args);if(!Flag(args,"/probe"))Application.Run();return 0;}catch(Exception e){if(app!=null)app.StopOwned();try{File.AppendAllText(Path.Combine(root,"launcher-error.log"),e.ToString());}catch{}if(!Flag(args,"/probe")&&!Flag(args,"/background"))MessageBox.Show(e.Message,"拾素材",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}finally{if(app!=null)app.Dispose();mutex.ReleaseMutex();}}
  }
 }

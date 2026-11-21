@@ -30,7 +30,7 @@ async function renderDuplicate(job){
 }
 $('#duplicate-reuse').onclick=act(async()=>renderJob(await send({type:'job-control',action:'reuse',jobId:currentJob.id,allRemaining:$('#duplicate-all').checked})));
 $('#duplicate-keep').onclick=act(async()=>renderJob(await send({type:'job-control',action:'keep',jobId:currentJob.id,allRemaining:$('#duplicate-all').checked})));
-$('#view-library').onclick=act(async()=>{const c=await chrome.storage.local.get('server');await chrome.tabs.create({url:c.server||'http://127.0.0.1:41600'});});
+$('#view-library').onclick=act(async()=>{await send({type:'open-desktop'});});
 $('#settings').onclick=()=>chrome.runtime.openOptionsPage();
 $('#scan').onclick=act(async()=>{const button=$('#scan');button.disabled=true;$('#status').textContent='正在读取页面提供的图片候选…';try{const r=await send({type:'scan'});lastScan=r;images=r.images;selected.clear();tab={id:r.tabId,url:r.pageURL};render();$('#status').textContent=`找到 ${images.length} 张图片${r.truncated?'（已达扫描上限，结果不完整）':''}。滚动加载后可重新扫描。`;}finally{button.disabled=false;}});
 $('#images').onclick=act(async e=>{const b=e.target.closest('[data-index]');if(!b)return;const i=images[Number(b.dataset.index)];selected.has(i.id)?selected.delete(i.id):selected.add(i.id);render();await persistScan();});

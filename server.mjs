@@ -28,7 +28,7 @@ import {encodeZip} from './zip-stream.mjs';
 import {packExportEntries} from './eagle-pack.mjs';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
-import {desktopAction,desktopDragFiles} from './desktop-actions.mjs';
+import {desktopAction,desktopDragFiles,showDesktopWindow} from './desktop-actions.mjs';
 import {psdDimensions,psdFileDimensions} from './psd-preview.mjs';
 import {PreviewTasks} from './preview-tasks.mjs';
 import sharp from 'sharp';
@@ -102,7 +102,9 @@ const needsLocation=()=>process.env.ASSETNEST_REQUIRE_LOCATION==='1'&&!libraries
 function activate(next){if(next===catalog)return;void watches.stop();void maintenance.close();analyzer.stop();void transfers.close();void previews.stop();catalog=next;db=catalog.db;DATA=catalog.root;LIBRARY_ID=catalog.libraryId;transfers=new Transfers(catalog);analyzer=new FeatureAnalyzer(catalog);analyzer.schedule();previews=new PreviewTasks(catalog);trash=new Trash(catalog);maintenance=new MaintenanceJobs(catalog,transfers);watches=makeWatchFolders();organization=new OrganizationJobs(catalog);}
 let pickerBusy=false;
 async function pickDirectory(){
- if(pickerBusy)throw error('文件夹选择窗口已打开',409);const helper=[path.join(ROOT,'FolderPicker.exe'),path.join(ROOT,'desktop/bin/FolderPicker.exe')].find(f=>fs.existsSync(f));if(!helper)throw error('文件夹选择器未安装，请输入完整路径');pickerBusy=true;
+ if(pickerBusy)throw error('文件夹选择窗口已打开',409);
+ if(process.platform==='darwin'){pickerBusy=true;try{return await new Promise((resolve,reject)=>execFile('/usr/bin/osascript',['-e','POSIX path of (choose folder with prompt "选择素材库文件夹")'],{timeout:180000,encoding:'utf8'},(e,out)=>e?reject(error('文件夹选择已取消或超时，可手动输入路径')):resolve({cancelled:false,directory:out.trim()})));}finally{pickerBusy=false;}}
+ const helper=[path.join(ROOT,'FolderPicker.exe'),path.join(ROOT,'desktop/bin/FolderPicker.exe')].find(f=>fs.existsSync(f));if(!helper)throw error('文件夹选择器未安装，请输入完整路径');pickerBusy=true;
  try{return await new Promise((resolve,reject)=>execFile(helper,[DATA],{windowsHide:true,timeout:180000,encoding:'utf8'},(e,out)=>{if(e)return reject(error('文件夹选择已取消或超时，可手动输入路径'));try{resolve(JSON.parse(out.replace(/^\uFEFF/,'')));}catch{reject(error('无法读取选择的文件夹'));}}));}finally{pickerBusy=false;}
 }
 async function download(url){let u=new URL(url);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw error('仅支持 HTTP/HTTPS 图片地址');const response=await fetch(u,{signal:AbortSignal.timeout(45000)});if(!response.ok)throw error('图片下载失败：HTTP '+response.status);const type=(response.headers.get('content-type')||'').split(';')[0];if(!type.startsWith('image/'))throw error('地址未返回图片，请尝试插件的图片内容采集');if(Number(response.headers.get('content-length'))>50*1024*1024)throw error('单张图片超过 50MB');const chunks=[];let size=0;for await(const c of response.body){size+=c.length;if(size>50*1024*1024)throw error('单张图片超过 50MB');chunks.push(c);}return {bytes:Buffer.concat(chunks),ext:type.split('/')[1].replace('jpeg','jpg').replace('svg+xml','svg')};}
@@ -121,7 +123,7 @@ const server=http.createServer(async(req,res)=>{
  if(route.startsWith('/api/')){
  if(req.headers['x-assetnest-key']!==KEY)throw error('连接密钥无效，请在软件设置中复制密钥',401);
  if(origin&&!extension&&!ownOrigins.includes(origin))throw error('来源不允许',403);
- const readPost=route==='/api/collector-status'||route==='/api/search'||route==='/api/shutdown'||route.startsWith('/api/updates')||route.startsWith('/api/watch-folders/')||route.startsWith('/api/previews/')||route==='/api/cache/clear'||route.startsWith('/api/jobs/')&&route.endsWith('/cancel'),requestLibrary=LIBRARY_ID,checkLibrary=(allowBusy=false)=>{if(!allowBusy&&req.method!=='GET'&&!readPost)transfers.assertIdle();if(requestLibrary!==LIBRARY_ID||req.headers['x-assetnest-library']&&req.headers['x-assetnest-library']!==LIBRARY_ID)throw error('目标素材库已切换，请刷新后重试',409);};checkLibrary();if(req.method!=='GET'&&!readPost)transfers.assertIdle();
+ const readPost=route==='/api/collector-status'||route==='/api/search'||route==='/api/shutdown'||route==='/api/desktop/show'||route.startsWith('/api/updates')||route.startsWith('/api/watch-folders/')||route.startsWith('/api/previews/')||route==='/api/cache/clear'||route.startsWith('/api/jobs/')&&route.endsWith('/cancel'),requestLibrary=LIBRARY_ID,checkLibrary=(allowBusy=false)=>{if(!allowBusy&&req.method!=='GET'&&!readPost)transfers.assertIdle();if(requestLibrary!==LIBRARY_ID||req.headers['x-assetnest-library']&&req.headers['x-assetnest-library']!==LIBRARY_ID)throw error('目标素材库已切换，请刷新后重试',409);};checkLibrary();if(req.method!=='GET'&&!readPost)transfers.assertIdle();
  res.once('finish',()=>{if(req.method!=='GET')analyzer.schedule();});
  if(needsLocation()&&['/api/upload','/api/capture','/api/bookmark','/api/import-pack','/api/import-confirm'].includes(route))throw error('请先在拾素材中选择素材库保存位置',409);
  if(route==='/api/updates'||route==='/api/updates/check'){if(extension)throw error('请在软件中检查更新',403);if(route==='/api/updates'&&req.method==='GET')return json(res,200,updateChecker.status());if(route==='/api/updates'&&req.method==='PATCH')return json(res,200,updateChecker.configure(await input(req)));if(route==='/api/updates/check'&&req.method==='POST'){const p=await input(req);return json(res,200,await updateChecker.check({force:p.force===true}));}throw error('更新操作无效',400);}
@@ -137,6 +139,10 @@ const server=http.createServer(async(req,res)=>{
   if(parts.length===4&&req.method==='DELETE')return json(res,200,watches.remove(parts[3]));
   if(parts.length===5&&parts[4]==='retry'&&req.method==='POST')return json(res,200,watches.retry(parts[3]));
   throw error('监控文件夹接口不存在',404);
+ }
+ if(route==='/api/desktop/show'&&req.method==='POST'){
+  if(process.env.ASSETNEST_DESKTOP!=='1')throw error('请启动桌面客户端',409);
+  return json(res,200,await showDesktopWindow({root:ROOT,port:PORT}));
  }
  if(route.startsWith('/api/desktop/')&&req.method==='POST'){if(extension||process.env.ASSETNEST_DESKTOP!=='1')throw error('此操作请在桌面客户端中使用',403);const p=await input(req);checkLibrary();if(route==='/api/desktop/drag-files'){if(!req.headers['x-assetnest-library'])throw error('请指定目标素材库',409);return json(res,200,desktopDragFiles(catalog,p.ids));}return json(res,200,await desktopAction(catalog,route.slice(13),p.id));}
  if(route==='/api/cache/clear'&&req.method==='POST'){if(extension)throw error('请在软件中清理缓存',403);const result=await previews.clear();checkLibrary();return json(res,200,result);}
@@ -162,6 +168,7 @@ const server=http.createServer(async(req,res)=>{
   if(route==='/api/libraries'&&req.method==='GET')return json(res,200,libraries.list());
   if(route==='/api/libraries/rescan'&&req.method==='POST'){const p=await input(req);checkLibrary();const result=catalog.refreshExternal?.(true)||{changed:false};analyzer.schedule();return json(res,200,{...result,...libraries.list()});}
   if(route==='/api/libraries/picker'&&req.method==='POST')return json(res,200,await pickDirectory());
+  if(route==='/api/libraries/create'&&req.method==='POST'){const p=await input(req);checkLibrary();libraries.createIn(p);activate(libraries.catalog);return json(res,200,{...libraries.list(),dataPath:DATA});}
   if(route==='/api/libraries/setup'&&req.method==='POST'){const p=await input(req);checkLibrary();libraries.setup(p);activate(libraries.catalog);return json(res,200,{...libraries.list(),dataPath:DATA});}
   if(route==='/api/libraries'&&req.method==='POST'){const p=await input(req);checkLibrary();return json(res,200,libraries.register(p));}
   if(route==='/api/libraries/switch'&&req.method==='POST'){const p=await input(req);checkLibrary();activate(libraries.switch(p.directory));return json(res,200,{...libraries.list(),dataPath:DATA});}

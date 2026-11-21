@@ -32,6 +32,16 @@ export class Libraries{
   }
   this.locationConfirmed=true;this.persist();return this.list();
  }
+ createIn({parent,name}){
+  if(typeof parent!=='string'||!path.isAbsolute(parent)||!fs.existsSync(parent)||!fs.statSync(parent).isDirectory())throw fail('请选择保存素材库的磁盘或文件夹');
+  if(typeof name!=='string')throw fail('请输入素材库名称');
+  name=name.trim().replace(/\.library$/i,'');
+  if(!name||name.length>100||/[<>:"/\\|?*\x00-\x1f]/.test(name)||/^[. ]+$/.test(name)||/[. ]$/.test(name))throw fail('名称不能包含斜杠或特殊路径字符');
+  if(/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(name))throw fail('此名称是 Windows 保留名称，请换个名称');
+  const directory=path.join(fs.realpathSync(parent),name+'.library');
+  if(fs.existsSync(directory))throw fail('此位置已有同名文件夹，请换个名称，或选择“打开已有素材库”');
+  this.register({directory,name,create:true});this.switch(directory);this.locationConfirmed=true;this.persist();return this.list();
+ }
  register({directory,name,create=false}){
   if(typeof directory!=='string'||!path.isAbsolute(directory)||typeof name!=='string'||!name.trim()||name.length>200)throw fail('请输入素材库名称与绝对路径');
   const target=path.resolve(directory);if(this.entries.some(e=>e.path.toLowerCase()===target.toLowerCase()))throw fail('该素材库已添加');

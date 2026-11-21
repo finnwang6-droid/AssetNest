@@ -15,13 +15,14 @@ collect(path.join(root,'extension'),'assetnest-extension');
 const extensionName=`assetnest-extension-${extension.version}.zip`,extensionZip=zipSync(extensionFiles,{level:6});
 const instructions=`拾素材 AssetNest ${app.version}（Windows x64）
 
-安装软件：双击 ${installerName}，首次启动选择素材库位置。
+安装软件：双击 ${installerName}，首次启动自动创建默认素材库，可在软件中更换位置。
 软件已包含 Node.js 运行环境；需要系统安装 Microsoft Edge WebView2 Runtime。
 安装包尚未进行代码签名。请核对下载来源和 SHA-256。
 
 安装浏览器扩展：解压后，在 Chrome / Edge 的扩展管理页面启用开发者模式，
 选择“加载已解压的扩展程序”，加载 assetnest-extension 文件夹。
-启动软件并选择素材库后，打开扩展即可自动配对。
+启动软件后，打开扩展即可自动配对。采集成功通知点击后会唤起桌面窗口。
+新建素材库：选择保存位置，输入名称，点击“创建并切换”；软件自动建立对应子文件夹。
 浏览器扩展版本：${extension.version}。
 
 直接读写 Eagle 素材库前，请先退出 Eagle 并备份原库。

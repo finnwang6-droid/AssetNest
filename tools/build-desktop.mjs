@@ -7,7 +7,7 @@ import {zipSync,unzipSync} from 'fflate';
 const root=path.resolve(import.meta.dirname,'..'),release=path.join(root,'releases'),build=path.join(root,'test-output/desktop-build');fs.mkdirSync(build,{recursive:true});fs.mkdirSync(release,{recursive:true});
 const runtime=path.join(root,'runtime/node.exe'),expected=fs.readFileSync(path.join(root,'runtime/SHASUMS256.txt'),'utf8').split(/\r?\n/).find(l=>l.endsWith(' win-x64/node.exe')).split(/\s+/)[0];
 if(crypto.createHash('sha256').update(fs.readFileSync(runtime)).digest('hex')!==expected)throw Error('Bundled Node checksum mismatch');
-const csc='C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe';
+const csc=path.join(process.env.SystemRoot||'C:/Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe');
 function compile(source,out,extras=[],target='winexe'){const r=spawnSync(csc,['/nologo','/win32icon:'+path.join(root,'assets/assetnest.ico'),'/target:'+target,'/platform:x64','/optimize+','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll','/r:System.IO.Compression.dll','/r:System.IO.Compression.FileSystem.dll','/r:Microsoft.CSharp.dll',...extras.filter(x=>!x.endsWith('.cs')),'/out:'+out,path.join(root,'desktop',source),...extras.filter(x=>x.endsWith('.cs'))],{encoding:'utf8',windowsHide:true});if(r.status!==0)throw Error(r.stdout+r.stderr);}
 const webview=path.join(root,'desktop/webview2-sdk/1.0.4258.31'),webviewPackage=path.join(webview,'microsoft.web.webview2.1.0.4258.31.nupkg');
 if(crypto.createHash('sha256').update(fs.readFileSync(webviewPackage)).digest('hex')!=='56f7f4b8bf9aee4b8efefbbdd4f67d5f74ebd1b100ed0806da71bf76af481aa9')throw Error('WebView2 SDK checksum mismatch');
